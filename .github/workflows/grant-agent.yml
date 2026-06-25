@@ -4,7 +4,7 @@ on:
   schedule:
     # Monday at 12:00 UTC = 8:00 AM ET (summer / EDT = UTC-4)
     # Adjust to 13:00 UTC in winter when EST = UTC-5
-    - cron: '0 12 * * 1'
+    - cron: '0 14 * * 1'
   workflow_dispatch:
     # Allows manual trigger from GitHub Actions UI (use this to test)
 
