@@ -1,0 +1,16 @@
+{
+  "name": "wfaf-grant-agent",
+  "version": "1.0.0",
+  "description": "Automated grant discovery agent for Wagner Farm Arboretum Foundation",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.105.0",
+    "@supabase/supabase-js": "^2.47.0"
+  }
+}

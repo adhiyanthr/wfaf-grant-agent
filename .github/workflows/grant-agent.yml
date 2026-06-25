@@ -1,0 +1,35 @@
+name: WFAF Grant Agent
+
+on:
+  schedule:
+    # Monday at 12:00 UTC = 8:00 AM ET (summer / EDT = UTC-4)
+    # Adjust to 13:00 UTC in winter when EST = UTC-5
+    - cron: '0 12 * * 1'
+  workflow_dispatch:
+    # Allows manual trigger from GitHub Actions UI (use this to test)
+
+jobs:
+  search-grants:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run grant agent
+        run: node src/index.js
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
