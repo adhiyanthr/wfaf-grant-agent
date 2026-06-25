@@ -40,8 +40,7 @@ export async function saveGrants(grants) {
     first_seen: new Date().toISOString(),
   }));
 
-  const { error } = await getClient().from('grants').insert(rows);
-  if (error) throw new Error(`Supabase insert error: ${error.message}`);
+const { error } = await getClient().from('grants').upsert(rows, { onConflict: 'url', ignoreDuplicates: true });  if (error) throw new Error(`Supabase insert error: ${error.message}`);
 }
 
 export async function markDigestSent(urls) {
