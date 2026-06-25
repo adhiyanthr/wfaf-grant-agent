@@ -1,5 +1,5 @@
-const RECIPIENTS = ['ggp@wfafnj.org', 'administrator@wfafnj.org'];
-const FROM = 'WFAF Grant Agent <grants@wfafnj.org>';
+const RECIPIENTS = ['adhiyanth.r@gmail.com'];
+const FROM = 'WFAF Grant Agent <onboarding@resend.dev>';
 
 function formatDeadline(deadline) {
   if (!deadline) return 'No deadline listed';
