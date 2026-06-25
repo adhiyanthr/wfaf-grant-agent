@@ -65,6 +65,9 @@ export async function searchGrants() {
   }
 
   // Validate and clean each grant
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
   const valid = grants.filter((g) => {
     if (!g.title || !g.url) {
       console.warn('Skipping grant missing title or url:', g);
@@ -72,6 +75,13 @@ export async function searchGrants() {
     }
     if (typeof g.fit_score !== 'number' || g.fit_score < 6) {
       return false;
+    }
+    if (g.deadline) {
+      const deadline = new Date(g.deadline + 'T00:00:00');
+      if (deadline < today) {
+        console.warn('Skipping expired grant:', g.title, g.deadline);
+        return false;
+      }
     }
     return true;
   });
