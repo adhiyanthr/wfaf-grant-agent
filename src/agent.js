@@ -27,7 +27,6 @@ export async function searchGrants() {
     ],
   });
 
-  // Log search count for cost visibility
   const searchBlocks = response.content.filter(
     (b) => b.type === 'tool_use' && b.name === 'web_search'
   );
@@ -36,7 +35,6 @@ export async function searchGrants() {
     `Tokens used — input: ${response.usage.input_tokens}, output: ${response.usage.output_tokens}`
   );
 
-  // Extract text content blocks
   const textBlocks = response.content.filter((b) => b.type === 'text');
   const fullText = textBlocks.map((b) => b.text).join('');
 
@@ -44,8 +42,6 @@ export async function searchGrants() {
     throw new Error('Agent returned no text content');
   }
 
-  // Parse JSON array from response
-  // Claude may occasionally prefix with a sentence despite instructions — handle it
   const jsonMatch = fullText.match(/\[[\s\S]*\]/);
   if (!jsonMatch) {
     console.error('Raw agent response:', fullText.slice(0, 500));
@@ -64,9 +60,8 @@ export async function searchGrants() {
     throw new Error('Agent response is not a JSON array');
   }
 
-  // Validate and clean each grant
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
 
   const valid = grants.filter((g) => {
     if (!g.title || !g.url) {
@@ -78,7 +73,7 @@ export async function searchGrants() {
     }
     if (g.deadline) {
       const deadline = new Date(g.deadline + 'T00:00:00');
-      if (deadline < today) {
+      if (deadline < now) {
         console.warn('Skipping expired grant:', g.title, g.deadline);
         return false;
       }
