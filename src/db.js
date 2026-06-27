@@ -78,8 +78,8 @@ export async function saveGrants(grants) {
     fit_rationale: g.fit_rationale ?? null,
     tags: g.tags ?? [],
   }));
-
-  const { error } = await getClient().from('grants').upsert(rows, { onConflict: 'url' });
+const uniqueRows = [...new Map(rows.map(r => [r.url, r])).entries()].map(([, r]) => r);
+  const { error } = await getClient().from('grants').upsert(uniqueRows, { onConflict: 'url' });
   if (error) throw new Error(`Supabase insert error: ${error.message}`);
 }
 
