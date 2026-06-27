@@ -88,7 +88,7 @@ Return results as a raw JSON array only — no text, no markdown.`,
   });
 
   const searchBlocks = response.content.filter(
-    (b) => b.type === 'tool_use' && b.name === 'web_search'
+    (b) => b.type === 'server_tool_use' && b.name === 'web_search'
   );
   console.log(`Agent performed ${searchBlocks.length} web searches`);
   console.log(
