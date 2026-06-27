@@ -94,6 +94,7 @@ After completing your searches, output ONLY a raw JSON array — no explanation,
 
 Rules:
 - Only include grants scoring 6 or higher
+- For each grant, extract the application deadline if it is mentioned. Return it as an ISO date string (YYYY-MM-DD). If no deadline is mentioned, return null. Do not invent deadlines.
 - Use null for amount_min, amount_max, or deadline if unknown
 - URL must be a real, specific page (not a homepage)
 - fit_rationale must reference a specific WFAF program or stat
