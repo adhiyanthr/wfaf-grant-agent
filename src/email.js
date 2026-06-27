@@ -1,18 +1,33 @@
 const RECIPIENTS = ['adhiyanth.r@gmail.com'];
 const FROM = 'WFAF Grant Agent <onboarding@resend.dev>';
 
-function formatDeadline(deadline) {
-  if (!deadline) return 'No deadline listed';
+const CLOSING_SOON_DAYS = 30;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+// Days from now until a deadline (negative = past). null if no/invalid deadline.
+function daysUntil(deadline) {
+  if (!deadline) return null;
   const d = new Date(deadline + 'T00:00:00');
-  const diff = Math.ceil((d - new Date()) / (1000 * 60 * 60 * 24));
+  if (isNaN(d)) return null;
+  return Math.ceil((d - Date.now()) / DAY_MS);
+}
+
+function isClosingSoon(g) {
+  const days = daysUntil(g.deadline);
+  return days !== null && days >= 0 && days <= CLOSING_SOON_DAYS;
+}
+
+// "Deadline: Month D, YYYY" or "Deadline: unknown"
+function formatDeadline(deadline) {
+  if (!deadline) return 'Deadline: unknown';
+  const d = new Date(deadline + 'T00:00:00');
+  if (isNaN(d)) return 'Deadline: unknown';
   const formatted = d.toLocaleDateString('en-US', {
     month: 'long',
     day: 'numeric',
     year: 'numeric',
   });
-  if (diff <= 14) return `⚠️ ${formatted} (${diff} days)`;
-  if (diff <= 30) return `⏰ ${formatted} (${diff} days)`;
-  return `📅 ${formatted}`;
+  return `Deadline: ${formatted}`;
 }
 
 function formatAmount(min, max) {
@@ -29,19 +44,27 @@ function scoreColor(score) {
   return '#52796f';
 }
 
-function buildGrantCard(g) {
+function buildGrantCard(g, urgent) {
   const amount = formatAmount(g.amount_min, g.amount_max);
-  const deadline = formatDeadline(g.deadline);
   const tags = (g.tags || []).map((t) => `#${t}`).join(' ');
+
+  const days = daysUntil(g.deadline);
+  const daysLeft = days !== null && days >= 0 ? ` (${days} day${days === 1 ? '' : 's'} left)` : '';
+  const deadlineLabel = `${formatDeadline(g.deadline)}${daysLeft}`;
+
+  // In "Closing Soon" cards the deadline is bold + colored for prominence.
+  const deadlineHtml = urgent
+    ? `<div style="font-size:14px; font-weight:700; color:#C0392B; margin-bottom:3px;">⏰ ${deadlineLabel}</div>`
+    : `<div style="font-size:14px; color:#333;">${deadlineLabel}</div>`;
 
   return `
     <div style="
       border: 1px solid #d4e6d9;
-      border-left: 4px solid ${scoreColor(g.fit_score)};
+      border-left: 4px solid ${urgent ? '#C0392B' : scoreColor(g.fit_score)};
       border-radius: 6px;
       padding: 16px 20px;
       margin-bottom: 16px;
-      background: #fafffe;
+      background: ${urgent ? '#fffaf9' : '#fafffe'};
     ">
       <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;">
         <h3 style="margin: 0 0 4px; font-size: 15px; color: #1a1a1a; line-height: 1.4;">
@@ -65,7 +88,7 @@ function buildGrantCard(g) {
 
       <div style="font-size: 14px; color: #333; margin-bottom: 8px;">
         ${amount ? `<div style="margin-bottom:3px;">💰 ${amount}</div>` : ''}
-        <div>${deadline}</div>
+        ${deadlineHtml}
       </div>
 
       <p style="margin: 8px 0 6px; font-size: 14px; color: #444; font-style: italic;">
@@ -89,13 +112,26 @@ function buildGrantCard(g) {
   `;
 }
 
+function sectionHeader(text) {
+  return `
+    <h2 style="
+      font-size: 16px;
+      color: #2d6a4f;
+      margin: 28px 0 14px;
+      padding-bottom: 6px;
+      border-bottom: 2px solid #d4e6d9;
+    ">${text}</h2>
+  `;
+}
+
 function buildEmail(grants) {
-  const sorted = [...grants].sort((a, b) => {
-    if (!a.deadline && !b.deadline) return 0;
-    if (!a.deadline) return 1;
-    if (!b.deadline) return -1;
-    return new Date(a.deadline) - new Date(b.deadline);
-  });
+  // Section 1: deadline within 30 days, most urgent first.
+  const closingSoon = grants
+    .filter(isClosingSoon)
+    .sort((a, b) => new Date(a.deadline) - new Date(b.deadline));
+
+  // Section 2: everything else surfaced this run.
+  const newThisWeek = grants.filter((g) => !isClosingSoon(g));
 
   const weekOf = new Date().toLocaleDateString('en-US', {
     month: 'long',
@@ -103,20 +139,17 @@ function buildEmail(grants) {
     year: 'numeric',
   });
 
-  const urgentCount = sorted.filter((g) => {
-    if (!g.deadline) return false;
-    const diff = Math.ceil((new Date(g.deadline) - new Date()) / (1000 * 60 * 60 * 24));
-    return diff <= 30;
-  }).length;
-
-  const urgentBanner =
-    urgentCount > 0
-      ? `<div style="background:#fff3cd; border:1px solid #ffc107; border-radius:6px; padding:12px 16px; margin-bottom:20px; font-size:14px; color:#664d00;">
-          ⚠️ <strong>${urgentCount} grant${urgentCount > 1 ? 's' : ''}</strong> deadline within 30 days — review those first.
-        </div>`
-      : '';
-
-  const cards = sorted.map(buildGrantCard).join('');
+  let sections = '';
+  if (closingSoon.length) {
+    sections +=
+      sectionHeader('⏰ Closing Soon — Act Now') +
+      closingSoon.map((g) => buildGrantCard(g, true)).join('');
+  }
+  if (newThisWeek.length) {
+    sections +=
+      sectionHeader('🆕 New This Week') +
+      newThisWeek.map((g) => buildGrantCard(g, false)).join('');
+  }
 
   return `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 620px; margin: 0 auto; padding: 24px 16px; color: #1a1a1a;">
@@ -124,16 +157,15 @@ function buildEmail(grants) {
       <div style="border-bottom: 3px solid #2d6a4f; padding-bottom: 16px; margin-bottom: 24px;">
         <h1 style="margin: 0 0 4px; color: #2d6a4f; font-size: 22px;">🌱 WFAF Grant Digest</h1>
         <p style="margin: 0; color: #666; font-size: 14px;">
-          ${sorted.length} new grant${sorted.length !== 1 ? 's' : ''} found · Week of ${weekOf}
+          ${grants.length} grant${grants.length !== 1 ? 's' : ''} this week · Week of ${weekOf}
         </p>
       </div>
 
-      ${urgentBanner}
-      ${cards}
+      ${sections}
 
       <div style="border-top: 1px solid #e0e0e0; margin-top: 24px; padding-top: 16px; font-size: 12px; color: #999;">
         This digest is generated automatically each Monday by the WFAF Grant Agent.
-        Grants are sorted by deadline. All amounts and deadlines should be verified at the source link before applying.
+        All amounts and deadlines should be verified at the source link before applying.
       </div>
     </div>
   `;
