@@ -38,12 +38,12 @@ function buildRotatingSearches(now) {
   const year = now.getFullYear();
 
   const temporal = [
-    `NJ nonprofit grants deadline ${month} ${year}`,
-    `NJ grants opening ${month} ${year}`,
-    `new NJ foundation grants ${year}`,
+    `NJ nonprofit grants "now open" ${year}`,
+    `NJ nonprofit RFP "just released" OR "new cycle" ${year}`,
+    `NJ foundation grants "applications open" ${month} ${year}`,
   ];
-  const category = CATEGORY_SEARCHES[week % CATEGORY_SEARCHES.length];
-  const funder = FUNDER_SEARCHES[week % FUNDER_SEARCHES.length];
+  const category = `${CATEGORY_SEARCHES[week % CATEGORY_SEARCHES.length]} now open ${year}`;
+  const funder = `${FUNDER_SEARCHES[week % FUNDER_SEARCHES.length]} new cycle ${year}`;
 
   return { week, searches: [...temporal, category, funder] };
 }

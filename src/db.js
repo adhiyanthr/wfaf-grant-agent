@@ -18,6 +18,19 @@ function getClient() {
   return _supabase;
 }
 
+// Normalize funder+title for fuzzy duplicate matching: lowercase, strip
+// punctuation, collapse whitespace. Same funder + same normalized title is
+// treated as the same grant even under a different URL.
+function normKey(funder, title) {
+  const norm = (s) =>
+    (s ?? '')
+      .toLowerCase()
+      .replace(/[^\w\s]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  return `${norm(funder)}||${norm(title)}`;
+}
+
 // Days from now until a deadline (negative = past). null if no/invalid deadline.
 function daysUntil(deadline) {
   if (!deadline) return null;
@@ -29,7 +42,7 @@ function daysUntil(deadline) {
 export async function filterNewGrants(grants) {
   const { data: existing, error } = await getClient()
     .from('grants')
-    .select('url, first_seen');
+    .select('url, first_seen, funder, title');
 
   if (error) throw new Error(`Supabase read error: ${error.message}`);
 
@@ -38,10 +51,22 @@ export async function filterNewGrants(grants) {
     (existing || []).map((r) => [r.url, r.first_seen])
   );
 
+  // Normalized "funder||title" keys already in the DB, for cross-URL dedup.
+  const existingFunderTitle = new Set(
+    (existing || []).map((r) => normKey(r.funder, r.title))
+  );
+
   const now = Date.now();
 
   return grants.filter((g) => {
     if (!g.url) return false;
+
+    // Second duplicate check: a NEW url whose funder+title already exists in
+    // the DB is the same grant re-listed elsewhere — skip even though the URL
+    // differs. (Known URLs are handled by upsert, so this only guards new ones.)
+    if (!firstSeenByUrl.has(g.url) && existingFunderTitle.has(normKey(g.funder, g.title))) {
+      return false;
+    }
 
     // "Closing Soon" exception: deadline within 30 days always surfaces,
     // regardless of first_seen.
