@@ -43,36 +43,9 @@ LOW FIT (1–4): Anything unrelated to food, environment, education, or communit
 YOUR TASK:
 Search comprehensively for open grants WFAF qualifies for. Cover all these angles:
 
-Federal sources:
-- USDA Community Food Projects Competitive Grant (CFPCGP)
-- USDA NRCS EQIP Organic Initiative
-- USDA Northeast SARE (Sustainable Agriculture Research & Education)
-- USDA Agricultural Marketing Service grants
-- USDA Rural Development community facility grants
-- EPA Environmental Education grants (EEGS)
-- USDA Farm to School grants
-- AmeriCorps/CNCS volunteer program grants
-
-NJ State sources:
-- NJ Department of Agriculture grants
-- NJ State Agriculture Development Committee (SADC)
-- NJ Department of Environmental Protection (DEP) grants
-- NJ Green Acres Program
-- NJ Hunger Free NJ / food security programs
-- New Jersey Health Initiatives
-
-Foundation/private sources:
-- Horizon Blue Cross Blue Shield Foundation NJ
-- Robert Wood Johnson Foundation (NJ-based)
-- Geraldine R. Dodge Foundation
-- Community Foundation of New Jersey
-- Somerset Hills Community Foundation
-- County-level community foundations in NJ
-- NOFA-NJ affiliated grants
-- Wells Fargo Foundation community grants
-- Home Depot Foundation community garden grants
-- Whole Foods Foundation / food security grants
-- Walmart Foundation food relief grants
+- Federal agricultural and food security grants
+- NJ state environmental and food access grants
+- Corporate and private foundation grants for NJ nonprofits
 
 Only include grants with deadlines in the future. If a grant recurs annually and the next cycle is open or upcoming, include it.
 
