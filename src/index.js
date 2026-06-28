@@ -1,37 +1,80 @@
-import { searchGrants } from './agent.js';
-import { filterNewGrants, saveGrants, markDigestSent } from './db.js';
+import { searchGrantsForOrg } from './agent.js';
+import {
+  getActiveOrgs,
+  getOrgByEmail,
+  filterNewGrantsForOrg,
+  saveOrgGrants,
+  markOrgDigestSent,
+} from './db.js';
 import { sendDigest } from './email.js';
+
+// Full per-org pipeline: search -> dedup -> persist -> email -> mark sent.
+async function runForOrg(org) {
+  console.log(`\n[${org.email}] ${org.name} — starting`);
+
+  const grants = await searchGrantsForOrg(org);
+  console.log(`  ${grants.length} qualifying grants from search`);
+
+  const newGrants = await filterNewGrantsForOrg(org.id, grants);
+  console.log(`  ${newGrants.length} are new for this org`);
+
+  if (!newGrants.length) {
+    console.log('  No new grants — no email sent.');
+    return { sent: 0 };
+  }
+
+  // saveOrgGrants mutates newGrants with each grant's catalog id.
+  await saveOrgGrants(org.id, newGrants);
+  await sendDigest(org, newGrants);
+  await markOrgDigestSent(org.id, newGrants.map((g) => g.id).filter(Boolean));
+
+  console.log(`  Done — ${newGrants.length} grants emailed to ${org.email}`);
+  return { sent: newGrants.length };
+}
 
 async function run() {
   const start = Date.now();
-  console.log(`[${new Date().toISOString()}] WFAF grant agent starting...`);
+  const target = process.env.TARGET_ORG_EMAIL?.trim();
 
-  // 1. Agent searches the web and returns scored grants
-  const grants = await searchGrants();
-  console.log(`Agent returned ${grants.length} qualifying grants`);
-
-  // 2. Filter to only new grants (not already in DB)
-  const newGrants = await filterNewGrants(grants);
-  console.log(`${newGrants.length} are new (not previously seen)`);
-
-  if (!newGrants.length) {
-    console.log('No new grants this week. No email sent.');
-    console.log(`Completed in ${((Date.now() - start) / 1000).toFixed(1)}s`);
-    return;
+  let orgs;
+  if (target) {
+    // Manual single-org run (workflow_dispatch / mid-week onboarding / demo).
+    console.log(`[${new Date().toISOString()}] Single-org run for ${target}`);
+    const org = await getOrgByEmail(target);
+    if (!org) throw new Error(`No organization found with email ${target}`);
+    if (!org.active) {
+      console.warn(`Note: ${target} is marked inactive; sending anyway (manual run).`);
+    }
+    orgs = [org];
+  } else {
+    // Weekly cron path: every active org.
+    console.log(`[${new Date().toISOString()}] GrantEquity grant agent starting (all active orgs)...`);
+    orgs = await getActiveOrgs();
+    console.log(`${orgs.length} active org(s) to process`);
   }
 
-  // 3. Persist new grants
-  await saveGrants(newGrants);
-  console.log(`Saved ${newGrants.length} new grants to Supabase`);
+  let totalSent = 0;
+  let failures = 0;
 
-  // 4. Send email digest
-  await sendDigest(newGrants);
+  // Sequential so we don't trip Anthropic rate limits; one org's failure must
+  // not abort the rest of the batch.
+  for (const org of orgs) {
+    try {
+      const { sent } = await runForOrg(org);
+      totalSent += sent;
+    } catch (err) {
+      failures += 1;
+      console.error(`  [${org.email}] FAILED: ${err.message}`);
+    }
+  }
 
-  // 5. Mark as sent
-  await markDigestSent(newGrants.map((g) => g.url));
-
-  console.log(`Done. ${newGrants.length} grants emailed.`);
+  console.log(
+    `\nAll done. ${totalSent} grant(s) emailed across ${orgs.length} org(s); ${failures} failure(s).`
+  );
   console.log(`Completed in ${((Date.now() - start) / 1000).toFixed(1)}s`);
+
+  // Fail the CI run only if every org errored (likely a systemic problem).
+  if (orgs.length && failures === orgs.length) process.exit(1);
 }
 
 run().catch((err) => {

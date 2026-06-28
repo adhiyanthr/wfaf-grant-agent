@@ -1,5 +1,7 @@
-const RECIPIENTS = ['adhiyanth.r@gmail.com'];
-const FROM = 'WFAF Grant Agent <onboarding@resend.dev>';
+// Sending identity. Override MAIL_FROM with a verified custom domain (e.g.
+// "GrantEquity <grants@mail.grantequity.org>") for real outreach — the
+// resend.dev test address is not deliverable to real subscribers.
+const FROM = process.env.MAIL_FROM || 'GrantEquity <onboarding@resend.dev>';
 
 const CLOSING_SOON_DAYS = 30;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -42,6 +44,14 @@ function scoreColor(score) {
   if (score >= 9) return '#1a6b3a';
   if (score >= 7) return '#2d6a4f';
   return '#52796f';
+}
+
+// The per-org unsubscribe URL (one-click + footer link). Returns null when the
+// base URL or token is missing so we degrade gracefully in local testing.
+function unsubscribeUrl(org) {
+  const base = process.env.UNSUBSCRIBE_BASE_URL;
+  if (!base || !org.unsubscribe_token) return null;
+  return `${base.replace(/\/$/, '')}/unsubscribe?token=${org.unsubscribe_token}`;
 }
 
 function buildGrantCard(g, urgent) {
@@ -124,7 +134,29 @@ function sectionHeader(text) {
   `;
 }
 
-function buildEmail(grants) {
+// CAN-SPAM footer: unsubscribe mechanism + physical postal address, plus the
+// standard "verify at source" disclaimer.
+function buildFooter(org) {
+  const unsubUrl = unsubscribeUrl(org);
+  const address = process.env.MAILING_ADDRESS || '';
+
+  return `
+    <div style="border-top: 1px solid #e0e0e0; margin-top: 24px; padding-top: 16px; font-size: 12px; color: #999; line-height: 1.6;">
+      <p style="margin: 0 0 8px;">
+        This grant digest is sent by GrantEquity, a free service for New Jersey nonprofits.
+        Verify all amounts and deadlines at the source link before applying.
+      </p>
+      ${
+        unsubUrl
+          ? `<p style="margin: 0 0 8px;">Don't want these emails? <a href="${unsubUrl}" style="color:#2d6a4f;">Unsubscribe here</a>.</p>`
+          : ''
+      }
+      ${address ? `<p style="margin: 0; color:#bbb;">${address}</p>` : ''}
+    </div>
+  `;
+}
+
+function buildEmail(org, grants) {
   // Section 1: deadline within 30 days, most urgent first.
   const closingSoon = grants
     .filter(isClosingSoon)
@@ -155,7 +187,7 @@ function buildEmail(grants) {
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 620px; margin: 0 auto; padding: 24px 16px; color: #1a1a1a;">
 
       <div style="border-bottom: 3px solid #2d6a4f; padding-bottom: 16px; margin-bottom: 24px;">
-        <h1 style="margin: 0 0 4px; color: #2d6a4f; font-size: 22px;">🌱 WFAF Grant Digest</h1>
+        <h1 style="margin: 0 0 4px; color: #2d6a4f; font-size: 22px;">🌱 Grant Digest for ${org.name}</h1>
         <p style="margin: 0; color: #666; font-size: 14px;">
           ${grants.length} grant${grants.length !== 1 ? 's' : ''} this week · Week of ${weekOf}
         </p>
@@ -163,16 +195,15 @@ function buildEmail(grants) {
 
       ${sections}
 
-      <div style="border-top: 1px solid #e0e0e0; margin-top: 24px; padding-top: 16px; font-size: 12px; color: #999;">
-        This digest is generated automatically each Monday by the WFAF Grant Agent.
-        All amounts and deadlines should be verified at the source link before applying.
-      </div>
+      ${buildFooter(org)}
     </div>
   `;
 }
 
-export async function sendDigest(grants) {
-  if (!grants.length) return;
+// Send one org its personalized digest. Returns the Resend message id.
+export async function sendDigest(org, grants) {
+  if (!grants.length) return null;
+  if (!org.email) throw new Error(`Org ${org.id || org.name} has no email`);
 
   const weekOf = new Date().toLocaleDateString('en-US', {
     month: 'short',
@@ -180,8 +211,28 @@ export async function sendDigest(grants) {
     year: 'numeric',
   });
 
-  const subject = `🌱 ${grants.length} New Grant${grants.length !== 1 ? 's' : ''} for WFAF – ${weekOf}`;
-  const html = buildEmail(grants);
+  const subject = `🌱 ${grants.length} New Grant${grants.length !== 1 ? 's' : ''} for ${org.name} – ${weekOf}`;
+  const html = buildEmail(org, grants);
+
+  // One-click unsubscribe (RFC 8058) so Gmail/Outlook render a native
+  // unsubscribe control and List-Unsubscribe-Post enables one-click POST.
+  const headers = {};
+  const unsubUrl = unsubscribeUrl(org);
+  if (unsubUrl) {
+    headers['List-Unsubscribe'] = `<${unsubUrl}>`;
+    headers['List-Unsubscribe-Post'] = 'List-Unsubscribe=One-Click';
+  }
+
+  const payload = {
+    from: FROM,
+    to: [org.email],
+    subject,
+    html,
+    headers,
+    // Echoed back in Resend webhook payloads so open/click events can be
+    // attributed to this org without a separate mapping table (Phase 4).
+    tags: [{ name: 'org_id', value: String(org.id) }],
+  };
 
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
@@ -189,12 +240,7 @@ export async function sendDigest(grants) {
       Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      from: FROM,
-      to: RECIPIENTS,
-      subject,
-      html,
-    }),
+    body: JSON.stringify(payload),
   });
 
   if (!res.ok) {
@@ -203,5 +249,6 @@ export async function sendDigest(grants) {
   }
 
   const result = await res.json();
-  console.log(`Email sent. Resend ID: ${result.id}`);
+  console.log(`  Email sent to ${org.email}. Resend ID: ${result.id}`);
+  return result.id;
 }
