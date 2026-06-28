@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { SYSTEM_PROMPT } from '../wfaf-profile.js';
+import { buildSystemPrompt } from './prompt.js';
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -31,29 +31,36 @@ function getISOWeek(date) {
 }
 
 // Build the 5 search queries for this run: 3 fixed temporal + 1 rotating
-// category + 1 rotating funder-type.
-function buildRotatingSearches(now) {
+// category + 1 rotating funder-type. Queries are flavored with the org's
+// county and primary focus area.
+function buildRotatingSearches(now, org) {
   const week = getISOWeek(now);
   const month = now.toLocaleString('en-US', { month: 'long' });
   const year = now.getFullYear();
 
+  const county = org.county || 'NJ';
+  const focus =
+    Array.isArray(org.focus_areas) && org.focus_areas.length
+      ? org.focus_areas[0]
+      : 'nonprofit';
+
   const temporal = [
-    `NJ nonprofit grants "now open" ${year}`,
-    `NJ nonprofit RFP "just released" OR "new cycle" ${year}`,
-    `NJ foundation grants "applications open" ${month} ${year}`,
+    `${county} NJ nonprofit grants "now open" ${year}`,
+    `${county} NJ nonprofit RFP "just released" OR "new cycle" ${year}`,
+    `${county} NJ foundation grants "applications open" ${month} ${year}`,
   ];
-  const category = `${CATEGORY_SEARCHES[week % CATEGORY_SEARCHES.length]} now open ${year}`;
+  const category = `${focus} ${CATEGORY_SEARCHES[week % CATEGORY_SEARCHES.length]} now open ${year}`;
   const funder = `${FUNDER_SEARCHES[week % FUNDER_SEARCHES.length]} new cycle ${year}`;
 
   return { week, searches: [...temporal, category, funder] };
 }
 
-export async function searchGrants() {
+export async function searchGrants(org) {
   const runDate = new Date();
   const today = runDate.toISOString().split('T')[0];
-  const { week, searches } = buildRotatingSearches(runDate);
+  const { week, searches } = buildRotatingSearches(runDate, org);
 
-  console.log(`Calling Claude with web search (ISO week ${week})...`);
+  console.log(`Calling Claude with web search for ${org.name} (ISO week ${week})...`);
   console.log('Rotating searches this run:');
   searches.forEach((s, i) => console.log(`  ${i + 1}. ${s}`));
 
@@ -69,7 +76,7 @@ export async function searchGrants() {
         max_uses: 15,
       },
     ],
-    system: SYSTEM_PROMPT,
+    system: buildSystemPrompt(org),
     messages: [
       {
         role: 'user',
@@ -78,7 +85,7 @@ export async function searchGrants() {
 Run these ${searches.length} web searches this week, then compile the results:
 ${searchList}
 
-Search thoroughly for all open grants that Wagner Farm Arboretum Foundation qualifies for. Cover federal, NJ state, and private foundation sources. Only include grants with future deadlines or upcoming open cycles.
+Search thoroughly for all open grants that ${org.name} qualifies for. Cover federal, NJ state, and private foundation sources. Only include grants with future deadlines or upcoming open cycles.
 
 For each grant, extract the application deadline if it is mentioned. Return it as an ISO date string (YYYY-MM-DD). If no deadline is mentioned, return null. Do not invent deadlines.
 

@@ -39,10 +39,22 @@ function daysUntil(deadline) {
   return Math.ceil((d - Date.now()) / DAY_MS);
 }
 
-export async function filterNewGrants(grants) {
+// Active organizations to run the pipeline for.
+export async function getActiveOrgs() {
+  const { data, error } = await getClient()
+    .from('organizations')
+    .select('*')
+    .eq('active', true);
+
+  if (error) throw new Error(`Supabase read error: ${error.message}`);
+  return data || [];
+}
+
+export async function filterNewGrants(grants, orgId) {
   const { data: existing, error } = await getClient()
     .from('grants')
-    .select('url, first_seen, funder, title');
+    .select('url, first_seen, funder, title')
+    .eq('org_id', orgId);
 
   if (error) throw new Error(`Supabase read error: ${error.message}`);
 
@@ -84,15 +96,16 @@ export async function filterNewGrants(grants) {
   });
 }
 
-export async function saveGrants(grants) {
+export async function saveGrants(grants, orgId) {
   if (!grants.length) return;
 
   // Note: first_seen is intentionally omitted from the payload.
   //  - New rows  -> first_seen takes the column default now() (set once).
-  //  - Resurfaced rows (url conflict) -> upsert updates the other fields
-  //    (deadline, amounts, fit) but leaves first_seen untouched, preserving
-  //    the original discovery date.
+  //  - Resurfaced rows ((org_id,url) conflict) -> upsert updates the other
+  //    fields (deadline, amounts, fit) but leaves first_seen untouched,
+  //    preserving the original discovery date.
   const rows = grants.map((g) => ({
+    org_id: orgId,
     title: g.title,
     funder: g.funder ?? null,
     amount_min: g.amount_min ?? null,
@@ -103,19 +116,25 @@ export async function saveGrants(grants) {
     fit_rationale: g.fit_rationale ?? null,
     tags: g.tags ?? [],
   }));
-const uniqueRows = [...new Map(rows.map(r => [r.url, r])).entries()].map(([, r]) => r);
-  const { error } = await getClient().from('grants').upsert(uniqueRows, { onConflict: 'url' });
+  // Dedup within the batch on (org_id, url) — the table's unique key.
+  const uniqueRows = [
+    ...new Map(rows.map((r) => [`${r.org_id}|${r.url}`, r])).entries(),
+  ].map(([, r]) => r);
+  const { error } = await getClient()
+    .from('grants')
+    .upsert(uniqueRows, { onConflict: 'org_id,url' });
   if (error) throw new Error(`Supabase insert error: ${error.message}`);
 }
 
 // Records when a grant was last included in a digest. digest_sent_at is the
 // "last_sent" timestamp — updated for every sent grant (new and resurfaced),
 // while first_seen is preserved by saveGrants above.
-export async function markDigestSent(urls) {
+export async function markDigestSent(urls, orgId) {
   if (!urls.length) return;
   const { error } = await getClient()
     .from('grants')
     .update({ digest_sent_at: new Date().toISOString() })
+    .eq('org_id', orgId)
     .in('url', urls);
 
   if (error) throw new Error(`Supabase update error: ${error.message}`);
