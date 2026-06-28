@@ -23,13 +23,14 @@ async function runForOrg(org) {
     return { sent: 0 };
   }
 
-  // saveOrgGrants mutates newGrants with each grant's catalog id.
-  await saveOrgGrants(org.id, newGrants);
-  await sendDigest(org, newGrants);
-  await markOrgDigestSent(org.id, newGrants.map((g) => g.id).filter(Boolean));
+  // saveOrgGrants dedupes by url and stamps each grant with its catalog id;
+  // use its returned array so the digest/marking match what was persisted.
+  const savedGrants = await saveOrgGrants(org.id, newGrants);
+  await sendDigest(org, savedGrants);
+  await markOrgDigestSent(org.id, savedGrants.map((g) => g.id).filter(Boolean));
 
-  console.log(`  Done — ${newGrants.length} grants emailed to ${org.email}`);
-  return { sent: newGrants.length };
+  console.log(`  Done — ${savedGrants.length} grants emailed to ${org.email}`);
+  return { sent: savedGrants.length };
 }
 
 async function run() {

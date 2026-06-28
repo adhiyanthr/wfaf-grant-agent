@@ -97,6 +97,16 @@ export async function filterNewGrantsForOrg(orgId, grants) {
 export async function saveOrgGrants(orgId, grants) {
   if (!grants.length) return grants;
 
+  // Dedupe by url within this batch: a single INSERT ... ON CONFLICT (url) DO
+  // UPDATE cannot touch the same row twice ("cannot affect row a second time"),
+  // and search can return the same grant URL more than once. Keep first seen.
+  const seen = new Set();
+  grants = grants.filter((g) => {
+    if (seen.has(g.url)) return false;
+    seen.add(g.url);
+    return true;
+  });
+
   // first_seen on `grants` is intentionally omitted so the column default
   // (now()) is set once and preserved across resurfacing upserts.
   const rows = grants.map((g) => ({
