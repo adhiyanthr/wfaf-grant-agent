@@ -1,5 +1,4 @@
-const RECIPIENTS = ['adhiyanth.r@gmail.com'];
-const FROM = 'WFAF Grant Agent <onboarding@resend.dev>';
+const FROM = 'Grant Agent <onboarding@resend.dev>';
 
 const CLOSING_SOON_DAYS = 30;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -124,7 +123,7 @@ function sectionHeader(text) {
   `;
 }
 
-function buildEmail(grants) {
+function buildEmail(grants, org) {
   // Section 1: deadline within 30 days, most urgent first.
   const closingSoon = grants
     .filter(isClosingSoon)
@@ -155,7 +154,7 @@ function buildEmail(grants) {
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 620px; margin: 0 auto; padding: 24px 16px; color: #1a1a1a;">
 
       <div style="border-bottom: 3px solid #2d6a4f; padding-bottom: 16px; margin-bottom: 24px;">
-        <h1 style="margin: 0 0 4px; color: #2d6a4f; font-size: 22px;">🌱 WFAF Grant Digest</h1>
+        <h1 style="margin: 0 0 4px; color: #2d6a4f; font-size: 22px;">${org.name} Grant Digest</h1>
         <p style="margin: 0; color: #666; font-size: 14px;">
           ${grants.length} grant${grants.length !== 1 ? 's' : ''} this week · Week of ${weekOf}
         </p>
@@ -164,14 +163,14 @@ function buildEmail(grants) {
       ${sections}
 
       <div style="border-top: 1px solid #e0e0e0; margin-top: 24px; padding-top: 16px; font-size: 12px; color: #999;">
-        This digest is generated automatically each Monday by the WFAF Grant Agent.
+        This digest is generated automatically each Monday by the ${org.name} Grant Agent.
         All amounts and deadlines should be verified at the source link before applying.
       </div>
     </div>
   `;
 }
 
-export async function sendDigest(grants) {
+export async function sendDigest(grants, org) {
   if (!grants.length) return;
 
   const weekOf = new Date().toLocaleDateString('en-US', {
@@ -180,8 +179,8 @@ export async function sendDigest(grants) {
     year: 'numeric',
   });
 
-  const subject = `🌱 ${grants.length} New Grant${grants.length !== 1 ? 's' : ''} for WFAF – ${weekOf}`;
-  const html = buildEmail(grants);
+  const subject = `${grants.length} New Grant${grants.length !== 1 ? 's' : ''} for ${org.name} – ${weekOf}`;
+  const html = buildEmail(grants, org);
 
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
@@ -191,7 +190,7 @@ export async function sendDigest(grants) {
     },
     body: JSON.stringify({
       from: FROM,
-      to: RECIPIENTS,
+      to: [org.email],
       subject,
       html,
     }),
