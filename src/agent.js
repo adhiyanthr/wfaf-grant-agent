@@ -39,17 +39,13 @@ function buildRotatingSearches(now, org) {
   const year = now.getFullYear();
 
   const county = org.county || 'NJ';
-  const focus =
-    Array.isArray(org.focus_areas) && org.focus_areas.length
-      ? org.focus_areas[0]
-      : 'nonprofit';
 
   const temporal = [
     `${county} NJ nonprofit grants "now open" ${year}`,
     `${county} NJ nonprofit RFP "just released" OR "new cycle" ${year}`,
     `${county} NJ foundation grants "applications open" ${month} ${year}`,
   ];
-  const category = `${focus} ${CATEGORY_SEARCHES[week % CATEGORY_SEARCHES.length]} now open ${year}`;
+  const category = `${county} ${CATEGORY_SEARCHES[week % CATEGORY_SEARCHES.length]} now open ${year}`;
   const funder = `${FUNDER_SEARCHES[week % FUNDER_SEARCHES.length]} new cycle ${year}`;
 
   return { week, searches: [...temporal, category, funder] };
