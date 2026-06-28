@@ -19,6 +19,19 @@ function getClient() {
   return _supabase;
 }
 
+// Normalize funder+title for fuzzy duplicate matching: lowercase, strip
+// punctuation, collapse whitespace. Same funder + same normalized title is
+// treated as the same grant even under a different URL.
+function normKey(funder, title) {
+  const norm = (s) =>
+    (s ?? '')
+      .toLowerCase()
+      .replace(/[^\w\s]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  return `${norm(funder)}||${norm(title)}`;
+}
+
 // Days from now until a deadline (negative = past). null if no/invalid deadline.
 function daysUntil(deadline) {
   if (!deadline) return null;
@@ -69,6 +82,11 @@ export async function filterNewGrantsForOrg(orgId, grants) {
       .map((r) => [r.grants.url, r.first_seen])
   );
 
+  // Normalized "funder||title" keys already in the DB, for cross-URL dedup.
+  const existingFunderTitle = new Set(
+    (existing || []).map((r) => normKey(r.funder, r.title))
+  );
+
   const now = Date.now();
 
   return grants.filter((g) => {
@@ -97,6 +115,7 @@ export async function saveOrgGrants(orgId, grants) {
   // first_seen on `grants` is intentionally omitted so the column default
   // (now()) is set once and preserved across resurfacing upserts.
   const rows = grants.map((g) => ({
+    org_id: orgId,
     title: g.title,
     funder: g.funder ?? null,
     amount_min: g.amount_min ?? null,
