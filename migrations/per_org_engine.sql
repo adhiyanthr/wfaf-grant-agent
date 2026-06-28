@@ -20,6 +20,11 @@
 alter table organizations add column if not exists unsubscribe_token uuid default gen_random_uuid();
 alter table organizations add column if not exists unsubscribed_at   timestamptz;
 
+-- last_sent: when this org last received a digest. The agent orders active orgs
+-- by it (getActiveOrgs) and writes it after every send (markGrantsSent). The
+-- signup table does not include it, so add it here.
+alter table organizations add column if not exists last_sent timestamptz;
+
 -- Backfill tokens for rows that predate the column (the default only fires on insert).
 update organizations set unsubscribe_token = gen_random_uuid() where unsubscribe_token is null;
 
