@@ -1,19 +1,10 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { buildSystemPrompt } from './prompt.js';
+import { buildSystemPrompt } from './profile.js';
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-// Category dimension — one selected per week via (week % 6).
-const CATEGORY_SEARCHES = [
-  'arts and culture NJ grants',
-  'education and youth NJ grants',
-  'environment and conservation NJ grants',
-  'health and human services NJ grants',
-  'community development NJ grants',
-  'social services and food security NJ grants',
-];
-
-// Funder-type dimension — one selected per week via (week % 4).
+// Funder-type dimension — one selected per week via (week % length) so that
+// federal / state / corporate / private all get coverage across weeks.
 const FUNDER_SEARCHES = [
   'federal grants available NJ nonprofits',
   'NJ state grants nonprofits',
@@ -30,35 +21,44 @@ function getISOWeek(date) {
   return Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
 }
 
-// Build the 5 search queries for this run: 3 fixed temporal + 1 rotating
-// category + 1 rotating funder-type. Queries are flavored with the org's
-// county and primary focus area.
-function buildRotatingSearches(now, org) {
+// Build this run's search queries for a specific org: temporal + county +
+// focus-area queries + one rotating funder-type query, derived from the org's
+// profile. Focus areas are the heart of per-org relevance.
+function buildOrgSearches(org, now) {
   const week = getISOWeek(now);
   const month = now.toLocaleString('en-US', { month: 'long' });
   const year = now.getFullYear();
 
-  const county = org.county || 'NJ';
+  const focusAreas = (org.focus_areas || []).filter(Boolean);
+  const county = org.county ? `${org.county} County NJ` : 'New Jersey';
 
-  const temporal = [
-    `${county} NJ nonprofit grants "now open" ${year}`,
-    `${county} NJ nonprofit RFP "just released" OR "new cycle" ${year}`,
-    `${county} NJ foundation grants "applications open" ${month} ${year}`,
+  const searches = [
+    `NJ nonprofit grants deadline ${month} ${year}`,
+    `${county} nonprofit grants ${year}`,
   ];
-  const category = `${county} ${CATEGORY_SEARCHES[week % CATEGORY_SEARCHES.length]} now open ${year}`;
-  const funder = `${FUNDER_SEARCHES[week % FUNDER_SEARCHES.length]} new cycle ${year}`;
 
-  return { week, searches: [...temporal, category, funder] };
+  if (focusAreas.length) {
+    for (const area of focusAreas.slice(0, 3)) {
+      searches.push(`${area} grants NJ nonprofits ${year}`);
+    }
+  } else {
+    searches.push(`grants for NJ nonprofits ${year}`);
+  }
+
+  searches.push(FUNDER_SEARCHES[week % FUNDER_SEARCHES.length]);
+
+  return { week, searches };
 }
 
-export async function searchGrants(org) {
+// Run one Claude web-search pass for a single organization and return its
+// scored, validated grants.
+export async function searchGrantsForOrg(org) {
   const runDate = new Date();
   const today = runDate.toISOString().split('T')[0];
-  const { week, searches } = buildRotatingSearches(runDate, org);
+  const { week, searches } = buildOrgSearches(org, runDate);
 
-  console.log(`Calling Claude with web search for ${org.name} (ISO week ${week})...`);
-  console.log('Rotating searches this run:');
-  searches.forEach((s, i) => console.log(`  ${i + 1}. ${s}`));
+  console.log(`  Searching for "${org.name}" (ISO week ${week})...`);
+  searches.forEach((s, i) => console.log(`    ${i + 1}. ${s}`));
 
   const searchList = searches.map((s, i) => `${i + 1}. ${s}`).join('\n');
 
@@ -81,7 +81,7 @@ export async function searchGrants(org) {
 Run these ${searches.length} web searches this week, then compile the results:
 ${searchList}
 
-Search thoroughly for all open grants that ${org.name} qualifies for. Cover federal, NJ state, and private foundation sources. Only include grants with future deadlines or upcoming open cycles.
+Search thoroughly for all open grants that ${org.name} qualifies for. Cover federal, NJ state, and private foundation sources relevant to its focus areas. Only include grants with future deadlines or upcoming open cycles.
 
 For each grant, extract the application deadline if it is mentioned. Return it as an ISO date string (YYYY-MM-DD). If no deadline is mentioned, return null. Do not invent deadlines.
 
@@ -93,9 +93,8 @@ Return results as a raw JSON array only — no text, no markdown.`,
   const searchBlocks = response.content.filter(
     (b) => b.type === 'server_tool_use' && b.name === 'web_search'
   );
-  console.log(`Agent performed ${searchBlocks.length} web searches`);
   console.log(
-    `Tokens used — input: ${response.usage.input_tokens}, output: ${response.usage.output_tokens}`
+    `  Agent performed ${searchBlocks.length} web searches — tokens in: ${response.usage.input_tokens}, out: ${response.usage.output_tokens}`
   );
 
   const textBlocks = response.content.filter((b) => b.type === 'text');
@@ -128,7 +127,7 @@ Return results as a raw JSON array only — no text, no markdown.`,
 
   const valid = grants.filter((g) => {
     if (!g.title || !g.url) {
-      console.warn('Skipping grant missing title or url:', g);
+      console.warn('  Skipping grant missing title or url:', g);
       return false;
     }
     if (typeof g.fit_score !== 'number' || g.fit_score < 6) {
@@ -137,13 +136,13 @@ Return results as a raw JSON array only — no text, no markdown.`,
     if (g.deadline) {
       const deadline = new Date(g.deadline + 'T00:00:00');
       if (deadline < now) {
-        console.warn('Skipping expired grant:', g.title, g.deadline);
+        console.warn('  Skipping expired grant:', g.title, g.deadline);
         return false;
       }
     }
     return true;
   });
 
-  console.log(`${valid.length} valid grants after filtering (${grants.length - valid.length} dropped)`);
+  console.log(`  ${valid.length} valid grants after filtering (${grants.length - valid.length} dropped)`);
   return valid;
 }

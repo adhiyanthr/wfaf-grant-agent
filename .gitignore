@@ -1,0 +1,15 @@
+# Secrets — never commit
+.env
+.env.*
+!.env.example
+
+# Dependencies
+node_modules/
+
+# Supabase CLI local state
+supabase/.branches/
+supabase/.temp/
+
+# OS / editor cruft
+.DS_Store
+*.log

@@ -1,59 +1,80 @@
-import { searchGrants } from './agent.js';
+import { searchGrantsForOrg } from './agent.js';
 import {
   getActiveOrgs,
-  filterNewGrants,
-  saveGrants,
-  markDigestSent,
+  getOrgByEmail,
+  filterNewGrantsForOrg,
+  saveOrgGrants,
+  markOrgDigestSent,
 } from './db.js';
 import { sendDigest } from './email.js';
 
-// Run the full grant pipeline for a single organization.
+// Full per-org pipeline: search -> dedup -> persist -> email -> mark sent.
 async function runForOrg(org) {
-  const grants = await searchGrants(org);
-  console.log(`  ${org.name}: agent returned ${grants.length} qualifying grants`);
+  console.log(`\n[${org.email}] ${org.name} — starting`);
 
-  const newGrants = await filterNewGrants(grants, org.id);
-  console.log(`  ${org.name}: ${newGrants.length} new (not previously seen)`);
+  const grants = await searchGrantsForOrg(org);
+  console.log(`  ${grants.length} qualifying grants from search`);
+
+  const newGrants = await filterNewGrantsForOrg(org.id, grants);
+  console.log(`  ${newGrants.length} are new for this org`);
 
   if (!newGrants.length) {
-    console.log(`  ${org.name}: no new grants — no email sent`);
-    return { found: grants.length, newGrants: 0, emailSent: false };
+    console.log('  No new grants — no email sent.');
+    return { sent: 0 };
   }
 
-  await saveGrants(newGrants, org.id);
-  await sendDigest(newGrants, org);
-  await markDigestSent(newGrants.map((g) => g.url), org.id);
+  // saveOrgGrants mutates newGrants with each grant's catalog id.
+  await saveOrgGrants(org.id, newGrants);
+  await sendDigest(org, newGrants);
+  await markOrgDigestSent(org.id, newGrants.map((g) => g.id).filter(Boolean));
 
-  console.log(`  ${org.name}: emailed ${newGrants.length} grants to ${org.email}`);
-  return { found: grants.length, newGrants: newGrants.length, emailSent: true };
+  console.log(`  Done — ${newGrants.length} grants emailed to ${org.email}`);
+  return { sent: newGrants.length };
 }
 
 async function run() {
   const start = Date.now();
-  console.log(`[${new Date().toISOString()}] Grant agent starting...`);
+  const target = process.env.TARGET_ORG_EMAIL?.trim();
 
-  const orgs = await getActiveOrgs();
-  console.log(`Found ${orgs.length} active organization(s)`);
+  let orgs;
+  if (target) {
+    // Manual single-org run (workflow_dispatch / mid-week onboarding / demo).
+    console.log(`[${new Date().toISOString()}] Single-org run for ${target}`);
+    const org = await getOrgByEmail(target);
+    if (!org) throw new Error(`No organization found with email ${target}`);
+    if (!org.active) {
+      console.warn(`Note: ${target} is marked inactive; sending anyway (manual run).`);
+    }
+    orgs = [org];
+  } else {
+    // Weekly cron path: every active org.
+    console.log(`[${new Date().toISOString()}] GrantEquity grant agent starting (all active orgs)...`);
+    orgs = await getActiveOrgs();
+    console.log(`${orgs.length} active org(s) to process`);
+  }
 
-  let succeeded = 0;
-  let failed = 0;
+  let totalSent = 0;
+  let failures = 0;
 
+  // Sequential so we don't trip Anthropic rate limits; one org's failure must
+  // not abort the rest of the batch.
   for (const org of orgs) {
-    console.log(`\n=== ${org.name} ===`);
     try {
-      await runForOrg(org);
-      succeeded++;
+      const { sent } = await runForOrg(org);
+      totalSent += sent;
     } catch (err) {
-      failed++;
-      console.error(`  ${org.name}: FAILED — ${err.message}`);
-      // Continue to the next org; one failure must not crash the whole run.
+      failures += 1;
+      console.error(`  [${org.email}] FAILED: ${err.message}`);
     }
   }
 
   console.log(
-    `\nDone. ${succeeded} org(s) succeeded, ${failed} failed, ` +
-      `${orgs.length} total. Completed in ${((Date.now() - start) / 1000).toFixed(1)}s`
+    `\nAll done. ${totalSent} grant(s) emailed across ${orgs.length} org(s); ${failures} failure(s).`
   );
+  console.log(`Completed in ${((Date.now() - start) / 1000).toFixed(1)}s`);
+
+  // Fail the CI run only if every org errored (likely a systemic problem).
+  if (orgs.length && failures === orgs.length) process.exit(1);
 }
 
 run().catch((err) => {

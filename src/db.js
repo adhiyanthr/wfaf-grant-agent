@@ -1,8 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Time-bounded dedup window. A grant is suppressed if it was first seen within
-// the last 330 days (~11 months); after that it may resurface (annual cycles
-// re-open). Grants closing within 30 days always surface regardless of age.
+// Time-bounded per-org dedup window. A grant is suppressed for an org if that
+// org first saw it within the last 330 days (~11 months); after that it may
+// resurface (annual cycles re-open). Grants closing within 30 days always
+// surface regardless of age.
 const TTL_DAYS = 330;
 const CLOSING_SOON_DAYS = 30;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -39,28 +40,46 @@ function daysUntil(deadline) {
   return Math.ceil((d - Date.now()) / DAY_MS);
 }
 
-// Active organizations to run the pipeline for.
+// All active, subscribed orgs to run the weekly digest for. active=false covers
+// both unsubscribes (Phase 1 flips it) and any manually paused orgs.
 export async function getActiveOrgs() {
   const { data, error } = await getClient()
     .from('organizations')
     .select('*')
-    .eq('active', true);
+    .eq('active', true)
+    .order('first_seen', { ascending: true });
 
-  if (error) throw new Error(`Supabase read error: ${error.message}`);
+  if (error) throw new Error(`Supabase read error (orgs): ${error.message}`);
   return data || [];
 }
 
-export async function filterNewGrants(grants, orgId) {
+// Single org by email — used by the manual (workflow_dispatch) single-org run.
+export async function getOrgByEmail(email) {
+  const { data, error } = await getClient()
+    .from('organizations')
+    .select('*')
+    .eq('email', email)
+    .maybeSingle();
+
+  if (error) throw new Error(`Supabase read error (org by email): ${error.message}`);
+  return data;
+}
+
+// Per-org dedup. A grant is suppressed if THIS org already has it within the
+// TTL window; grants closing within 30 days always surface.
+export async function filterNewGrantsForOrg(orgId, grants) {
   const { data: existing, error } = await getClient()
-    .from('grants')
-    .select('url, first_seen, funder, title')
+    .from('org_grants')
+    .select('first_seen, grants!inner(url)')
     .eq('org_id', orgId);
 
-  if (error) throw new Error(`Supabase read error: ${error.message}`);
+  if (error) throw new Error(`Supabase read error (org_grants): ${error.message}`);
 
-  // url -> first_seen timestamp for grants already in the DB
+  // url -> first_seen timestamp for grants this org has already been shown.
   const firstSeenByUrl = new Map(
-    (existing || []).map((r) => [r.url, r.first_seen])
+    (existing || [])
+      .filter((r) => r.grants)
+      .map((r) => [r.grants.url, r.first_seen])
   );
 
   // Normalized "funder||title" keys already in the DB, for cross-URL dedup.
@@ -73,37 +92,28 @@ export async function filterNewGrants(grants, orgId) {
   return grants.filter((g) => {
     if (!g.url) return false;
 
-    // Second duplicate check: a NEW url whose funder+title already exists in
-    // the DB is the same grant re-listed elsewhere — skip even though the URL
-    // differs. (Known URLs are handled by upsert, so this only guards new ones.)
-    if (!firstSeenByUrl.has(g.url) && existingFunderTitle.has(normKey(g.funder, g.title))) {
-      return false;
-    }
-
-    // "Closing Soon" exception: deadline within 30 days always surfaces,
-    // regardless of first_seen.
+    // "Closing Soon" exception: deadline within 30 days always surfaces.
     const days = daysUntil(g.deadline);
     if (days !== null && days >= 0 && days <= CLOSING_SOON_DAYS) {
       return true;
     }
 
     const firstSeen = firstSeenByUrl.get(g.url);
-    if (firstSeen === undefined) return true; // brand new — never seen
+    if (firstSeen === undefined) return true; // never shown to this org
 
-    // Previously seen: suppress unless the TTL has elapsed (annual resurface).
     const ageDays = (now - new Date(firstSeen).getTime()) / DAY_MS;
-    return ageDays > TTL_DAYS;
+    return ageDays > TTL_DAYS; // annual resurface
   });
 }
 
-export async function saveGrants(grants, orgId) {
-  if (!grants.length) return;
+// Upserts grants into the shared `grants` catalog (by url), then links them to
+// the org in `org_grants`. Mutates each grant with its catalog `id` and returns
+// the same array so callers can email + mark them.
+export async function saveOrgGrants(orgId, grants) {
+  if (!grants.length) return grants;
 
-  // Note: first_seen is intentionally omitted from the payload.
-  //  - New rows  -> first_seen takes the column default now() (set once).
-  //  - Resurfaced rows ((org_id,url) conflict) -> upsert updates the other
-  //    fields (deadline, amounts, fit) but leaves first_seen untouched,
-  //    preserving the original discovery date.
+  // first_seen on `grants` is intentionally omitted so the column default
+  // (now()) is set once and preserved across resurfacing upserts.
   const rows = grants.map((g) => ({
     org_id: orgId,
     title: g.title,
@@ -116,26 +126,56 @@ export async function saveGrants(grants, orgId) {
     fit_rationale: g.fit_rationale ?? null,
     tags: g.tags ?? [],
   }));
-  // Dedup within the batch on (org_id, url) — the table's unique key.
-  const uniqueRows = [
-    ...new Map(rows.map((r) => [`${r.org_id}|${r.url}`, r])).entries(),
-  ].map(([, r]) => r);
-  const { error } = await getClient()
+
+  const { data: saved, error } = await getClient()
     .from('grants')
-    .upsert(uniqueRows, { onConflict: 'org_id,url' });
-  if (error) throw new Error(`Supabase insert error: ${error.message}`);
+    .upsert(rows, { onConflict: 'url' })
+    .select('id, url');
+
+  if (error) throw new Error(`Supabase insert error (grants): ${error.message}`);
+
+  const idByUrl = new Map((saved || []).map((r) => [r.url, r.id]));
+  for (const g of grants) g.id = idByUrl.get(g.url);
+
+  // Link each grant to this org. org_grants.first_seen defaults to now() and is
+  // left untouched on conflict (ignoreDuplicates) so the org's discovery date
+  // for a grant is preserved across weeks.
+  const orgRows = grants
+    .filter((g) => g.id)
+    .map((g) => ({
+      org_id: orgId,
+      grant_id: g.id,
+      fit_score: g.fit_score,
+      fit_rationale: g.fit_rationale ?? null,
+    }));
+
+  if (orgRows.length) {
+    const { error: linkErr } = await getClient()
+      .from('org_grants')
+      .upsert(orgRows, { onConflict: 'org_id,grant_id', ignoreDuplicates: true });
+    if (linkErr) throw new Error(`Supabase insert error (org_grants): ${linkErr.message}`);
+  }
+
+  return grants;
 }
 
-// Records when a grant was last included in a digest. digest_sent_at is the
-// "last_sent" timestamp — updated for every sent grant (new and resurfaced),
-// while first_seen is preserved by saveGrants above.
-export async function markDigestSent(urls, orgId) {
-  if (!urls.length) return;
-  const { error } = await getClient()
-    .from('grants')
-    .update({ digest_sent_at: new Date().toISOString() })
-    .eq('org_id', orgId)
-    .in('url', urls);
+// Stamp the just-sent grants for this org and bump the org's last_sent.
+export async function markOrgDigestSent(orgId, grantIds) {
+  const client = getClient();
+  const nowIso = new Date().toISOString();
 
-  if (error) throw new Error(`Supabase update error: ${error.message}`);
+  if (grantIds.length) {
+    const { error } = await client
+      .from('org_grants')
+      .update({ digest_sent_at: nowIso })
+      .eq('org_id', orgId)
+      .in('grant_id', grantIds);
+    if (error) throw new Error(`Supabase update error (org_grants): ${error.message}`);
+  }
+
+  const { error: orgErr } = await client
+    .from('organizations')
+    .update({ last_sent: nowIso })
+    .eq('id', orgId);
+  if (orgErr) throw new Error(`Supabase update error (org last_sent): ${orgErr.message}`);
 }
