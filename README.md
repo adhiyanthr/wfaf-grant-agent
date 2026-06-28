@@ -1,6 +1,6 @@
-# WFAF Grant Agent
+# Grant Agent
 
-Automated weekly grant discovery for Wagner Farm Arboretum Foundation. Runs every Monday, searches the web using Claude + web_search, deduplicates against Supabase, and emails a digest to WFAF staff.
+Free automated weekly grant discovery for nonprofits that can't afford to pay for a grant finding subscription. Runs every Monday, searches the web using Claude + web_search, deduplicates against Supabase, and emails a digest to staff.
 
 ## How it works
 
