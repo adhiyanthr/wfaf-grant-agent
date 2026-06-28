@@ -70,7 +70,7 @@ RESEND_API_KEY
 Variables (Settings → Variables → Actions — non-secret):
 
 ```
-MAIL_FROM                e.g. GrantEquity <grants@mail.grantequity.org>
+MAIL_FROM                e.g. GrantEquity <grants@grantequity.org>
 UNSUBSCRIBE_BASE_URL     e.g. https://ujixxuvfpuykcmzcebmg.supabase.co/functions/v1
 MAILING_ADDRESS          physical postal address for the CAN-SPAM footer
 ```

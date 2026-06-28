@@ -19,7 +19,7 @@ supabase link --project-ref ujixxuvfpuykcmzcebmg
 supabase secrets set \
   SUPABASE_SERVICE_KEY=eyJ... \
   RESEND_API_KEY=re_... \
-  MAIL_FROM='GrantEquity <grants@mail.grantequity.org>' \
+  MAIL_FROM='GrantEquity <grants@grantequity.org>' \
   UNSUBSCRIBE_BASE_URL='https://ujixxuvfpuykcmzcebmg.supabase.co/functions/v1' \
   MAILING_ADDRESS='GrantEquity, PO Box 000, Somewhere, NJ 07000' \
   CONFIRM_WEBHOOK_SECRET="$(openssl rand -hex 16)" \
