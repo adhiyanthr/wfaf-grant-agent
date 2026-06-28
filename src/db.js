@@ -47,7 +47,10 @@ export async function getActiveOrgs() {
     .from('organizations')
     .select('*')
     .eq('active', true)
-    .order('first_seen', { ascending: true });
+    // Longest-unsent first (never-sent orgs lead), so a timed-out run still
+    // serves the orgs that have waited longest. `organizations` has no
+    // first_seen column — that lives on org_grants.
+    .order('last_sent', { ascending: true, nullsFirst: true });
 
   if (error) throw new Error(`Supabase read error (orgs): ${error.message}`);
   return data || [];
