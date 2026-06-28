@@ -9,7 +9,7 @@
 // Register the endpoint in the Resend dashboard (Webhooks) and copy its
 // signing secret into RESEND_WEBHOOK_SECRET.
 //
-// Env (function secrets): SUPABASE_URL, SUPABASE_SERVICE_KEY, RESEND_WEBHOOK_SECRET
+// Env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (auto-injected), RESEND_WEBHOOK_SECRET (secret)
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { Webhook } from 'https://esm.sh/svix@1.24.0';
@@ -62,7 +62,7 @@ Deno.serve(async (req) => {
 
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL')!,
-    Deno.env.get('SUPABASE_SERVICE_KEY')!
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   );
 
   const { error } = await supabase.from('email_events').insert({
