@@ -79,11 +79,17 @@ GRANT FIT CRITERIA — score each grant 1–10 for how well it fits ${name} spec
 ${sizeNote}
 
 ${SOURCE_GUIDANCE}
+(Use the guidance above only to judge whether a grant in the provided search results is relevant — NOT as a list of grants to report. Never report a grant that does not appear in the provided search results.)
 
 YOUR TASK:
-Search comprehensively for OPEN grants ${name} qualifies for, across federal, NJ state, and foundation/corporate sources relevant to its focus areas. Only include grants with deadlines in the future. If a grant recurs annually and the next cycle is open or upcoming, include it.
+You will be given a set of web search results (title, link, snippet) retrieved for ${name}. From those results ONLY, identify the grants ${name} qualifies for and score each for fit. Only include grants with deadlines in the future or an open/upcoming cycle.
 
-After completing your searches, output ONLY a raw JSON array — no explanation, no markdown, no code fences. Each object must have exactly these fields:
+ANTI-HALLUCINATION RULES (these override everything else):
+- Only include grants explicitly present in the search results provided below. Do not use prior knowledge of grant programs or funders.
+- If a deadline, amount, or eligibility detail is not stated in the provided text, output null for that field — do not infer, estimate, or round it.
+- Every grant entry must use a "url" value that appears verbatim as a "link" in the search results provided. Do not generate, complete, or guess a URL.
+
+After matching, output ONLY a raw JSON array — no explanation, no markdown, no code fences. Each object must have exactly these fields:
 
 [
   {
@@ -101,10 +107,10 @@ After completing your searches, output ONLY a raw JSON array — no explanation,
 
 Rules:
 - Only include grants scoring 6 or higher.
-- Extract the application deadline if it is mentioned. Return it as an ISO date string (YYYY-MM-DD). If none is mentioned, return null. Do not invent deadlines.
-- Use null for amount_min, amount_max, or deadline if unknown.
-- URL must be a real, specific page (not a homepage).
-- fit_rationale must reference something specific about ${name} (a focus area, population served, or program).
+- Extract the application deadline only if it is stated in the provided search text. Return it as an ISO date string (YYYY-MM-DD). If it is not stated, return null. Never invent or estimate a deadline.
+- Use null for amount_min, amount_max, or deadline whenever the value is not stated in the provided search text.
+- "url" must be copied verbatim from a "link" in the provided search results. Do not output a url that is not in the results.
+- fit_rationale must reference something specific about ${name} (a focus area, population served, or program), grounded in what the search result actually says.
 - Return only the JSON array — nothing else, no text before or after.
 `.trim();
 }
