@@ -1,17 +1,24 @@
 # GrantEquity Grant Agent
 
 Automated weekly grant discovery for New Jersey nonprofits. Every Monday it runs
-a **per-org** Claude + web_search pass for each subscribed organization,
-deduplicates against Supabase, and emails each org a personalized digest via
-Resend. Orgs sign up through the GrantEquity landing page, which inserts them
-into the Supabase `organizations` table.
+a **per-org** retrieval-and-matching pass for each subscribed organization:
+Serper.dev does the raw Google search, Claude filters the results to relevant
+grants, and each org gets a personalized digest via Resend. Results are
+deduplicated against Supabase. Orgs sign up through the GrantEquity landing page,
+which inserts them into the Supabase `organizations` table.
 
 ## How it works
 
 1. GitHub Actions fires Monday ~10am ET (or a manual single-org run on demand).
-2. For each **active** org, Claude (Sonnet 4.6) searches the web across federal,
-   NJ state, and foundation sources tailored to that org's focus areas + county.
-3. Results are scored against the org's profile and filtered to ≥6/10 fit.
+2. For each **active** org, **Serper.dev** runs the raw Google searches (federal,
+   NJ state, foundation angles tailored to the org's focus areas + county) and
+   returns structured `{title, link, snippet}` results.
+3. Claude (Sonnet 4.6, `temperature: 0`) matches and scores those results
+   against the org's profile, using the Serper snippets as its **only** source
+   of grant information (it does not search the web itself). Results are filtered
+   to ≥6/10 fit, every returned URL is validated in code against the Serper
+   result set (hallucinated links are dropped), and surviving grants get a cheap
+   Haiku full-page verification of their deadline/amount.
 4. Grants are saved to the shared `grants` catalog and linked per-org in
    `org_grants` (per-org dedup lives there).
 5. Resend delivers a formatted digest to the org, with a CAN-SPAM unsubscribe
@@ -48,8 +55,17 @@ key (server-side only — never ship it to the browser).
 
 ### 3. Anthropic API key
 
-From console.anthropic.com → API Keys. Web search is ~$10 / 1,000 searches and
-each org uses ~5 searches/run, so ~$1–2 per org per run.
+From console.anthropic.com → API Keys. The search step no longer uses Claude's
+native web-search tool — Serper does retrieval and Claude only does matching, so
+the per-org search cost is now mostly cheap input tokens over snippets plus a few
+Haiku verification calls.
+
+### 3b. Serper API key
+
+From serper.dev → API Key. Serper does the raw Google search. It bills per query
+(not per result); the free tier covers initial testing and the first paid tier is
+a few dollars per thousand queries. Each org runs ~5 queries/week, so the search
+step is near-zero cost compared with the native web-search tool fee it replaces.
 
 ### 4. Edge Functions (unsubscribe, confirmation, tracking)
 
@@ -62,6 +78,7 @@ Secrets (Settings → Secrets → Actions):
 
 ```
 ANTHROPIC_API_KEY
+SERPER_API_KEY
 SUPABASE_URL
 SUPABASE_SERVICE_KEY
 RESEND_API_KEY
