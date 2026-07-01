@@ -1,12 +1,8 @@
 # CLAUDE.md — wfaf-grant-agent (GrantEquity)
 
-Per-org weekly grant-discovery agent. Node (`src/`) runs, per subscribed org:
-Serper.dev raw Google search (`src/serper.js`) → Claude relevance matching over
-the snippets (`src/agent.js`, no native web_search tool) → code-side URL
-validation against the Serper result set → cheap Haiku full-page verification
-(`src/verify.js`). Dedups via Supabase, emails digests via Resend. Three Deno
-edge functions in `supabase/functions/` (unsubscribe/confirmation/webhook only —
-NOT the search). Full overview: `README.md`.
+Per-org weekly grant-discovery agent. Node (`src/`) runs Claude + web_search per
+subscribed org, dedups via Supabase, emails digests via Resend. Three Deno edge
+functions in `supabase/functions/`. Full overview: `README.md`.
 
 ## Key facts
 - **Supabase project ref:** `ujixxuvfpuykcmzcebmg` (functions base URL:
@@ -45,11 +41,8 @@ TARGET_ORG_EMAIL=x@y.com node src/index.js # single org
 ```
 
 ## CI config (authoritative split is in .github/workflows/grant-agent.yml)
-- GitHub **Secrets:** `ANTHROPIC_API_KEY`, `SERPER_API_KEY`, `SUPABASE_URL`,
-  `SUPABASE_SERVICE_KEY`, `RESEND_API_KEY`.
-- `SERPER_API_KEY` is a **GitHub Actions secret + local `.env`** (the search runs
-  in the Node agent, NOT in an edge function — do not set it via
-  `supabase secrets set`, nothing there would read it).
+- GitHub **Secrets:** `ANTHROPIC_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`,
+  `RESEND_API_KEY`.
 - GitHub **Variables:** `MAIL_FROM`, `UNSUBSCRIBE_BASE_URL`, `MAILING_ADDRESS`.
 - Function secrets (set via `supabase secrets set`): `CONFIRM_WEBHOOK_SECRET`,
   `RESEND_WEBHOOK_SECRET`, `MAIL_FROM`, `RESEND_API_KEY`, `UNSUBSCRIBE_BASE_URL`.
