@@ -1,13 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { buildSystemPrompt } from './profile.js';
-import { serperSearch } from './serper.js';
-import { verifyGrants } from './verify.js';
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
-// How many Serper results to request per query. Start small — Serper bills per
-// query, and smaller result sets keep the matching prompt cheap to reason over.
-const SERPER_RESULTS_PER_QUERY = 10;
 
 // Funder-type dimension — one selected per week via (week % length) so that
 // federal / state / corporate / private all get coverage across weeks.
@@ -56,29 +50,8 @@ function buildOrgSearches(org, now) {
   return { week, searches };
 }
 
-// Format the Serper results as a numbered, source-grounded block for the prompt.
-// Only title/link/snippet are exposed — this is the ONLY grant information the
-// model is allowed to use.
-function formatResultsForPrompt(results) {
-  return results
-    .map(
-      (r, i) =>
-        `[${i + 1}]
-title: ${r.title}
-link: ${r.link}
-snippet: ${r.snippet}`
-    )
-    .join('\n\n');
-}
-
-// Retrieval + matching pass for a single org:
-//   1. Serper does the raw Google search (cheap, structured, snippets only).
-//   2. Claude filters/matches those snippets to the org — it never searches the
-//      web itself and is instructed not to invent grants beyond the results.
-//   3. Every returned grant's url is validated (in code) against the set of
-//      links actually sent to the model; anything else is a hallucination and
-//      is dropped.
-//   4. Surviving grants get a cheap full-page verification pass (verify.js).
+// Run one Claude web-search pass for a single organization and return its
+// scored, validated grants.
 export async function searchGrantsForOrg(org) {
   const runDate = new Date();
   const today = runDate.toISOString().split('T')[0];
@@ -87,41 +60,41 @@ export async function searchGrantsForOrg(org) {
   console.log(`  Searching for "${org.name}" (ISO week ${week})...`);
   searches.forEach((s, i) => console.log(`    ${i + 1}. ${s}`));
 
-  // --- 1. Raw retrieval via Serper -----------------------------------------
-  const results = await serperSearch(searches, { num: SERPER_RESULTS_PER_QUERY });
-  console.log(`  Serper returned ${results.length} unique results across ${searches.length} queries`);
+  const searchList = searches.map((s, i) => `${i + 1}. ${s}`).join('\n');
 
-  if (!results.length) {
-    console.warn('  No Serper results — nothing to match against.');
-    return [];
-  }
-
-  // Set of valid links for code-side URL validation (step 4 below).
-  const validLinks = new Set(results.map((r) => r.link));
-
-  // --- 2. Relevance matching via Claude (extraction, temperature 0) --------
   const response = await client.messages.create({
     model: 'claude-sonnet-4-6',
     max_tokens: 4096,
-    temperature: 0,
+    tools: [
+      {
+        type: 'web_search_20250305',
+        name: 'web_search',
+        max_uses: 15,
+      },
+    ],
     system: buildSystemPrompt(org),
     messages: [
       {
         role: 'user',
         content: `Today is ${today} (ISO week ${week}).
 
-Below are the web search results retrieved for ${org.name} this week. These are the ONLY source of grant information available to you. Do not use any prior knowledge of grant programs or funders, and do not perform any search of your own.
+Run these ${searches.length} web searches this week, then compile the results:
+${searchList}
 
-SEARCH RESULTS:
-${formatResultsForPrompt(results)}
+Search thoroughly for all open grants that ${org.name} qualifies for. Cover federal, NJ state, and private foundation sources relevant to its focus areas. Only include grants with future deadlines or upcoming open cycles.
 
-From these results only, identify the grants ${org.name} qualifies for and score each for fit. Only include grants with deadlines in the future or an open/upcoming cycle. Return the JSON array exactly as specified in your instructions.`,
+For each grant, extract the application deadline if it is mentioned. Return it as an ISO date string (YYYY-MM-DD). If no deadline is mentioned, return null. Do not invent deadlines.
+
+Return results as a raw JSON array only — no text, no markdown.`,
       },
     ],
   });
 
+  const searchBlocks = response.content.filter(
+    (b) => b.type === 'server_tool_use' && b.name === 'web_search'
+  );
   console.log(
-    `  Matching pass — tokens in: ${response.usage.input_tokens}, out: ${response.usage.output_tokens}`
+    `  Agent performed ${searchBlocks.length} web searches — tokens in: ${response.usage.input_tokens}, out: ${response.usage.output_tokens}`
   );
 
   const textBlocks = response.content.filter((b) => b.type === 'text');
@@ -149,23 +122,12 @@ From these results only, identify the grants ${org.name} qualifies for and score
     throw new Error('Agent response is not a JSON array');
   }
 
-  const matchedCount = grants.length;
-
   const now = new Date();
   now.setHours(0, 0, 0, 0);
 
-  // --- 3 + 4. Filter by basic validity / fit / deadline, and validate URLs --
-  let urlDropped = 0;
-  let valid = grants.filter((g) => {
+  const valid = grants.filter((g) => {
     if (!g.title || !g.url) {
       console.warn('  Skipping grant missing title or url:', g);
-      return false;
-    }
-    // URL validation: the link MUST be one we actually sent the model. A url
-    // that isn't in the Serper result set is a hallucination, however plausible.
-    if (!validLinks.has(g.url)) {
-      console.warn('  Dropping grant with hallucinated url (not in Serper results):', g.url);
-      urlDropped += 1;
       return false;
     }
     if (typeof g.fit_score !== 'number' || g.fit_score < 6) {
@@ -181,19 +143,6 @@ From these results only, identify the grants ${org.name} qualifies for and score
     return true;
   });
 
-  // --- 5. Full-page verification of deadline/amount (optional) --------------
-  if (process.env.VERIFY_GRANTS !== 'false' && valid.length) {
-    const { unverifiedDeadlines, unverifiedAmounts, fetchFailures } = await verifyGrants(valid);
-    console.log(
-      `  Verification: ${unverifiedDeadlines} deadline(s) and ${unverifiedAmounts} amount(s) nulled as unconfirmed; ${fetchFailures} page(s) unreachable (left as-is).`
-    );
-  }
-
-  // Per-org-per-run hallucination signal: results in, matched, dropped by URL
-  // validation. A rising urlDropped over time flags model hallucination.
-  console.log(
-    `  [stats] serper_results=${results.length} matched=${matchedCount} url_dropped=${urlDropped} kept=${valid.length}`
-  );
-
+  console.log(`  ${valid.length} valid grants after filtering (${grants.length - valid.length} dropped)`);
   return valid;
 }
