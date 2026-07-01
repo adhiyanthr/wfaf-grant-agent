@@ -1,0 +1,1117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GrantEquity — small nonprofits miss grants they qualify for</title>
+  <meta name="description" content="Small nonprofits miss grants they qualify for. Every Monday, GrantEquity emails each org the grants they actually qualify for — free forever, with an app to review your matches." />
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="GrantEquity — small nonprofits miss grants they qualify for" />
+  <meta property="og:description" content="Every Monday, GrantEquity emails each nonprofit the grants they actually qualify for — pulled from foundation, county, and state sources. Free forever, with an app to review your matches." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://grantequity.org" />
+  <meta name="twitter:card" content="summary" />
+
+  <!-- Favicon (inline, self-contained) -->
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2315616d'/%3E%3Ctext x='16' y='22' font-family='Georgia,serif' font-size='19' font-weight='600' fill='white' text-anchor='middle'%3EG%3C/text%3E%3C/svg%3E" />
+
+  <!-- Inter (body) + Fraunces (display) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ============================================================
+       DESIGN SYSTEM
+       ============================================================ */
+    :root {
+      --bg:        #ffffff;
+      --bg-soft:   #f5f5f2;   /* single warm-neutral tint for all "moment" bands */
+      --ink:       #16212b;   /* primary text */
+      --ink-2:     #5a6775;   /* secondary text */
+      --ink-3:     #626d79;   /* tertiary / meta — WCAG AA (≥4.5:1 on white & bg-soft) */
+      --line:      #e6e9ed;   /* hairlines */
+      --line-2:    #d8dde3;
+      --accent:    #15616d;   /* dark teal — links + primary CTA only */
+      --accent-2:  #0f4a54;   /* accent hover */
+      --accent-tint: #eef4f5;
+
+      --maxw: 1080px;
+      --measure: 60ch;        /* readable text column inside wide layouts */
+      --pad: clamp(22px, 6vw, 48px);
+      --split: 860px;         /* breakpoint where layouts go two-column */
+
+      /* type scale */
+      --fs-hero: clamp(2.1rem, 6vw, 3.3rem);
+      --fs-h2:   clamp(1.5rem, 3.6vw, 2.05rem);
+      --fs-h3:   1.18rem;
+      --fs-lead: clamp(1.1rem, 2.2vw, 1.27rem);
+      --fs-body: 1.0625rem;   /* 17px */
+
+      /* vertical rhythm (width-driven for predictable spacing across viewport heights) */
+      --section-y: clamp(44px, 5.5vw, 76px);
+    }
+
+    /* ============================================================
+       RESET / BASE
+       ============================================================ */
+    *, *::before, *::after { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: "Inter", system-ui, -apple-system, sans-serif;
+      font-size: var(--fs-body);
+      line-height: 1.65;
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+    h1, h2, h3 {
+      margin: 0;
+      font-family: "Fraunces", Georgia, serif;
+      font-weight: 500;
+      line-height: 1.12;
+      letter-spacing: -0.01em;
+      color: var(--ink);
+    }
+    p { margin: 0; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    strong { font-weight: 600; color: var(--ink); }
+
+    .wrap {
+      max-width: var(--maxw);
+      margin: 0 auto;
+      padding-left: var(--pad);
+      padding-right: var(--pad);
+    }
+
+    section { padding: var(--section-y) 0; }
+    .rule { border: 0; border-top: 1px solid var(--line); margin: 0; }
+
+    .eyebrow {
+      font-family: "Inter", sans-serif;
+      font-size: 0.78rem;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin: 0 0 1rem;
+    }
+
+    /* ============================================================
+       BUTTON  (single accent use)
+       ============================================================ */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5em;
+      background: var(--accent);
+      color: #fff;
+      font-family: "Inter", sans-serif;
+      font-weight: 600;
+      font-size: 1.02rem;
+      line-height: 1;
+      padding: 0.95em 1.6em;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.18s ease;
+    }
+    .btn:hover { background: var(--accent-2); text-decoration: none; }
+    .btn:active { transform: translateY(1px); }
+    .btn:disabled { opacity: 0.6; cursor: default; }
+    .btn--ghost {
+      background: transparent;
+      color: var(--accent);
+      border: 1.5px solid var(--accent);
+    }
+    .btn--ghost:hover { background: var(--accent); color: #fff; text-decoration: none; }
+
+    /* visible keyboard focus for every interactive element */
+    a:focus-visible,
+    .btn:focus-visible,
+    .btn--ghost:focus-visible,
+    button:focus-visible,
+    input:focus-visible,
+    select:focus-visible,
+    textarea:focus-visible {
+      outline: 2px solid var(--accent-2);
+      outline-offset: 2px;
+    }
+
+    /* skip link — visible only when focused */
+    .skip-link {
+      position: absolute;
+      left: 12px;
+      top: -60px;
+      z-index: 100;
+      background: var(--accent);
+      color: #fff;
+      font-family: "Inter", sans-serif;
+      font-weight: 600;
+      padding: 0.7em 1.1em;
+      border-radius: 8px;
+      transition: top 0.16s ease;
+    }
+    .skip-link:focus { top: 12px; text-decoration: none; }
+
+    /* ============================================================
+       HEADER BAR
+       ============================================================ */
+    .site-header { border-bottom: 1px solid var(--line); }
+    .header__inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding-top: 18px;
+      padding-bottom: 18px;
+    }
+    .brandmark {
+      font-family: "Fraunces", serif;
+      font-weight: 600;
+      font-size: 1.2rem;
+      letter-spacing: -0.01em;
+      color: var(--ink);
+    }
+    .brandmark:hover { text-decoration: none; }
+    .header__nav { display: flex; align-items: center; gap: 1.25rem; }
+    .header__signin { font-size: 0.92rem; font-weight: 500; color: var(--ink-2); }
+    .header__signin:hover { color: var(--ink); }
+    .header__cta { font-size: 0.92rem; font-weight: 600; color: var(--accent); }
+
+    /* ============================================================
+       HERO  (copy left / email mockup right)
+       ============================================================ */
+    .hero { padding-top: clamp(28px, 3vw, 44px); padding-bottom: var(--section-y); }
+    .hero__grid {
+      display: grid;
+      gap: clamp(36px, 5vw, 64px);
+      align-items: center;
+    }
+    @media (min-width: 860px) {
+      .hero__grid {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 540px);
+        /* align copy to the top of the email so the hero has no top void */
+        align-items: start;
+      }
+      .hero__copy { padding-top: clamp(8px, 2vw, 28px); }
+    }
+    .hero h1 {
+      font-size: var(--fs-hero);
+      letter-spacing: -0.02em;
+      line-height: 1.1;
+      max-width: 18ch;
+      margin-bottom: 1.3rem;
+      /* high optical-size cut: more contrast/character at display size */
+      font-variation-settings: 'opsz' 144;
+    }
+    .hero .sub {
+      font-size: var(--fs-lead);
+      color: var(--ink-2);
+      max-width: 46ch;
+      margin-bottom: 2.2rem;
+    }
+    .hero .cta-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.9rem 1.4rem;
+    }
+    .hero .cta-note { font-size: 0.95rem; color: var(--ink-3); display: inline-flex; align-items: center; gap: 6px; }
+
+    /* ============================================================
+       EMAIL MOCKUP  (signature element)
+       ============================================================ */
+    .hero__preview { min-width: 0; }
+    .email {
+      max-width: 540px;
+      margin: 0 auto;
+      background: #fff;
+      border: 1px solid var(--line-2);
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 1px 2px rgba(22,33,43,0.04),
+                  0 24px 48px -24px rgba(22,33,43,0.28);
+      /* card: fade in + slide up on load */
+      opacity: 0;
+      transform: translateY(16px);
+      transition: opacity 0.4s ease-out 0.1s, transform 0.4s ease-out 0.1s;
+    }
+    .email.in-view { opacity: 1; transform: none; }
+
+    /* staggered reveal of section labels + grant rows */
+    .email .email__sec,
+    .email .grant {
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 0.4s ease-out, transform 0.4s ease-out;
+    }
+    .email.in-view .email__sec,
+    .email.in-view .grant { opacity: 1; transform: none; }
+    /* body children: greeting(1) · CLOSING SOON(2) · 2 rows · NEW THIS WEEK(5) · 3 rows · footer(9) */
+    .email.in-view .email__body > :nth-child(2) { transition-delay: 0.28s; } /* label, 20ms before row */
+    .email.in-view .email__body > :nth-child(3) { transition-delay: 0.30s; }
+    .email.in-view .email__body > :nth-child(4) { transition-delay: 0.38s; }
+    .email.in-view .email__body > :nth-child(5) { transition-delay: 0.44s; } /* label, 20ms before row */
+    .email.in-view .email__body > :nth-child(6) { transition-delay: 0.46s; }
+    .email.in-view .email__body > :nth-child(7) { transition-delay: 0.54s; }
+    .email.in-view .email__body > :nth-child(8) { transition-delay: 0.62s; }
+
+    /* sender row (top of the card — no fake app chrome) */
+    .email__head {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 20px 20px 14px;
+    }
+    .email__avatar {
+      flex-shrink: 0;
+      width: 40px; height: 40px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: #fff;
+      display: grid; place-items: center;
+      font-family: "Fraunces", serif;
+      font-weight: 600;
+      font-size: 1.15rem;
+    }
+    .email__meta { min-width: 0; flex: 1; }
+    .email__from { font-weight: 600; font-size: 0.94rem; color: var(--ink); }
+    .email__from span { font-weight: 400; color: var(--ink-3); }
+    .email__to { font-size: 0.82rem; color: var(--ink-3); margin-top: 1px; }
+    .email__date { flex-shrink: 0; font-size: 0.78rem; color: var(--ink-3); white-space: nowrap; }
+
+    .email__subject {
+      padding: 0 20px 4px;
+      font-weight: 600;
+      font-size: 1.02rem;
+      color: var(--ink);
+    }
+    .email__preview-text {
+      padding: 0 20px 16px;
+      font-size: 0.88rem;
+      color: var(--ink-2);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .email__body { padding: 18px 20px 8px; }
+    .email__greeting { font-size: 0.92rem; color: var(--ink-2); margin-bottom: 18px; }
+
+    .email__sec {
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--ink-3);
+      margin: 6px 0 4px;
+    }
+    .email__sec--soon { color: var(--accent); display: flex; align-items: center; gap: 5px; }
+    /* deadline glyph — the page's through-line motif (always teal) */
+    .sec-icon { flex-shrink: 0; }
+    .cta-note .sec-icon { color: var(--accent); }
+
+    .grant { padding: 13px 0; border-bottom: 1px solid var(--line); }
+    .grant:last-child { border-bottom: none; }
+    .grant__top {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 12px;
+    }
+    .grant__name { font-weight: 600; font-size: 0.92rem; color: var(--ink); }
+    .grant__amt {
+      flex-shrink: 0;
+      font-weight: 600;
+      font-size: 0.92rem;
+      color: var(--ink);
+      font-variant-numeric: tabular-nums;
+    }
+    .grant__meta {
+      font-size: 0.82rem;
+      color: var(--ink-2);
+      margin-top: 3px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+    }
+    .grant__pill {
+      font-size: 0.68rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      color: var(--accent);
+      background: var(--accent-tint);
+      border: 1px solid #d3e3e4;
+      padding: 2px 7px;
+      border-radius: 999px;
+    }
+
+    .email__footer {
+      margin-top: 6px;
+      padding: 14px 0 4px;
+      border-top: 1px solid var(--line);
+      font-size: 0.72rem;
+      line-height: 1.55;
+      color: var(--ink-3);
+    }
+    .email__footer a { color: var(--ink-3); text-decoration: underline; }
+
+    /* ============================================================
+       PROSE SECTIONS  —  editorial split: heading left / body right
+       ============================================================ */
+    section h2 { font-size: var(--fs-h2); line-height: 1.15; margin-bottom: 1.2rem; }
+    section .lead { color: var(--ink-2); font-size: 1.12rem; }
+    .prose p { color: var(--ink-2); }
+    .prose p + p { margin-top: 1.1rem; }
+
+    .alt { background: var(--bg-soft); }
+
+    .split { display: grid; gap: clamp(28px, 4vw, 64px); align-items: start; }
+    @media (min-width: 860px) {
+      .split { grid-template-columns: minmax(0, 330px) minmax(0, 1fr); }
+      .split__head { position: sticky; top: clamp(24px, 6vh, 56px); }
+    }
+    .split__head h2 { margin-bottom: 0; max-width: 16ch; }
+    .split__head .eyebrow { margin-bottom: 0.7rem; }
+    .split__body { max-width: var(--measure); }
+    .split__body > h2 { margin-bottom: 1.1rem; }
+
+    /* how it works — sequential steps, no numerals */
+    .steps { display: grid; gap: 1.8rem; }
+    .step h3 { font-size: var(--fs-h3); margin-bottom: 0.35rem; }
+    .step p { color: var(--ink-2); }
+
+    /* ============================================================
+       INTAKE FORM  —  intro left / form right
+       ============================================================ */
+    .intake__head h2 { margin-bottom: 0.8rem; }
+    .intake__head p { color: var(--ink-2); font-size: var(--fs-lead); max-width: 34ch; }
+    .intake__body { min-width: 0; }
+
+    form { display: grid; gap: 1.4rem; }
+    .field { display: grid; gap: 0.45rem; }
+    .field label, legend { font-size: 0.92rem; font-weight: 600; color: var(--ink); }
+    .field .hint, legend .hint { font-weight: 400; color: var(--ink-3); }
+    fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+    legend { padding: 0; margin-bottom: 0.45rem; }
+    input, select, textarea {
+      width: 100%;
+      background: #fff;
+      border: 1px solid var(--line-2);
+      border-radius: 8px;
+      color: var(--ink);
+      font-family: "Inter", sans-serif;
+      font-size: 1rem;
+      padding: 0.78em 0.9em;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    textarea { resize: vertical; min-height: 84px; }
+    input::placeholder, textarea::placeholder { color: var(--ink-3); }
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(21,97,109,0.13);
+    }
+    select {
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%235a6775' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 0.9em center;
+      padding-right: 2.4em;
+    }
+    .checkbox-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; margin-top: 0.3rem; }
+    .checkbox-grid label {
+      display: flex; align-items: center; gap: 0.55rem;
+      font-size: 0.92rem; font-weight: 400; color: var(--ink);
+    }
+    .checkbox-grid input[type="checkbox"] { width: auto; accent-color: var(--accent); margin: 0; }
+    .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.4rem; }
+    form .btn { width: 100%; margin-top: 0.4rem; }
+    .focus-error, .form-error { display: none; color: #b4232a; font-size: 0.92rem; margin-top: 0.4rem; }
+    .focus-error.show, .form-error.show { display: block; }
+    .form-error { text-align: center; }
+
+    /* success state */
+    .form-success {
+      display: none;
+      text-align: center;
+      padding: 2.6rem 1.6rem;
+      background: var(--accent-tint);
+      border: 1px solid #d3e3e4;
+      border-radius: 14px;
+    }
+    .form-success.show { display: block; }
+    .form-success .check {
+      width: 52px; height: 52px; margin: 0 auto 1.2rem;
+      border-radius: 50%; display: grid; place-items: center;
+      background: var(--accent); color: #fff;
+    }
+    .form-success h3 { font-size: 1.45rem; margin-bottom: 0.5rem; }
+    .form-success p { color: var(--ink-2); max-width: 38ch; margin: 0 auto; }
+
+    /* ============================================================
+       FOOTER
+       ============================================================ */
+    footer { padding: clamp(40px, 5.5vw, 68px) 0; border-top: 1px solid var(--line); }
+    .footer__grid { display: grid; gap: 1.8rem clamp(28px, 4vw, 64px); }
+    @media (min-width: 720px) {
+      .footer__grid { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); }
+    }
+    footer .brand { font-family: "Fraunces", serif; font-weight: 600; font-size: 1.15rem; margin-bottom: 0.7rem; }
+    footer p { color: var(--ink-2); font-size: 0.95rem; max-width: 46ch; }
+    footer p + p { margin-top: 0.5rem; }
+    footer .meta { display: flex; flex-wrap: wrap; gap: 0.4rem 1.4rem; font-size: 0.92rem; }
+    footer .addr { margin-top: 1.4rem; font-size: 0.82rem; color: var(--ink-3); }
+    @media (min-width: 720px) {
+      .footer__contact { text-align: right; }
+      .footer__contact .meta { justify-content: flex-end; }
+    }
+    .footer__identity {
+      max-width: none;
+      margin-top: clamp(28px, 4vw, 40px);
+      padding-top: 1.4rem;
+      border-top: 1px solid var(--line);
+      font-size: 0.88rem;
+      color: var(--ink-3);
+    }
+
+    /* ============================================================
+       MISSION STATEMENT  (narrow, centered, serif)
+       ============================================================ */
+    .mission {
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      padding-top: clamp(56px, 6.5vw, 88px);
+      padding-bottom: clamp(56px, 6.5vw, 88px);
+    }
+    .mission__text {
+      max-width: 680px;
+      margin: 0 auto;
+      text-align: center;
+      font-family: "Fraunces", Georgia, serif;
+      font-weight: 400;
+      font-size: 1.3rem;
+      line-height: 1.6;
+      letter-spacing: -0.005em;
+      color: var(--ink);
+    }
+
+    /* ============================================================
+       PROBLEM-SCALE STAT  (folded into The Problem as a lead figure)
+       ============================================================ */
+    .prose .figure-stat { margin-bottom: 1.7rem; }
+    .prose .figure-stat__num {
+      display: block;
+      font-family: "Fraunces", Georgia, serif;
+      font-weight: 500;
+      font-size: clamp(2.6rem, 5vw, 3.6rem);
+      line-height: 1;
+      letter-spacing: -0.02em;
+      color: var(--accent);
+      font-variation-settings: 'opsz' 144;
+      margin-bottom: 0.5rem;
+    }
+    .prose .figure-stat__desc {
+      margin: 0;
+      font-size: 1.15rem;
+      line-height: 1.5;
+      color: var(--ink);
+    }
+    .prose .figure-stat__src {
+      display: block;
+      margin-top: 0.6rem;
+      font-size: 0.6875rem;
+      letter-spacing: 0.04em;
+      color: var(--ink-3);
+    }
+
+    /* ============================================================
+       HOW IT WORKS  —  three step cards
+       ============================================================ */
+    .section-head { max-width: var(--measure); margin-bottom: clamp(32px, 5vw, 52px); }
+    .section-head h2 { margin-top: 0.5rem; margin-bottom: 0; }
+    .stepcards { display: grid; gap: 1.4rem; }
+    @media (min-width: 768px) { .stepcards { grid-template-columns: repeat(2, 1fr); } }
+    @media (min-width: 1020px) { .stepcards { grid-template-columns: repeat(4, 1fr); } }
+    .stepcard {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 24px;
+    }
+    .stepcard__num {
+      font-family: "Fraunces", Georgia, serif;
+      font-weight: 400;
+      font-size: 2.6rem;
+      line-height: 1;
+      color: var(--accent);
+      margin-bottom: 0.7rem;
+    }
+    .stepcard h3 { font-size: var(--fs-h3); margin-bottom: 0.4rem; }
+    .stepcard p { color: var(--ink-2); font-size: 0.98rem; }
+
+    /* ============================================================
+       WHY IT'S FREE  —  single centered block
+       ============================================================ */
+    .whyfree { border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+    .centerblock { max-width: 640px; margin: 0 auto; text-align: center; }
+    .centerblock h2 { margin-bottom: 1rem; }
+    .centerblock p { color: var(--ink-2); }
+
+    /* ============================================================
+       PLATFORM FEATURES  —  what you'll see in the app
+       ============================================================ */
+    .platform-features { display: grid; gap: 0; margin-bottom: 1.75rem; }
+    .feature-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 1rem;
+      padding-block: 1rem;
+      border-bottom: 1px solid var(--line);
+      opacity: 0;
+      transform: translateY(12px);
+      transition: opacity 0.4s ease-out, transform 0.4s ease-out;
+      will-change: opacity, transform;
+    }
+    .feature-row:last-of-type { border-bottom: none; }
+    .platform-features.in-view .feature-row { opacity: 1; transform: none; will-change: auto; }
+    .platform-features.in-view .feature-row:nth-child(2) { transition-delay: 0.08s; }
+    .platform-features.in-view .feature-row:nth-child(3) { transition-delay: 0.16s; }
+    .feature-icon {
+      flex-shrink: 0;
+      width: 10px; height: 10px;
+      margin-top: 5px;
+      color: var(--accent);
+    }
+    .feature-content h3 { font-size: var(--fs-h3); margin-bottom: 0.25rem; }
+    .feature-content p { color: var(--ink-2); font-size: 0.98rem; }
+
+    /* ============================================================
+       RESPONSIVE
+       ============================================================ */
+    @media (max-width: 540px) {
+      .row-2 { grid-template-columns: 1fr; }
+      .checkbox-grid { grid-template-columns: 1fr; }
+      .email__head { flex-wrap: wrap; }
+      .email__date { width: 100%; margin-left: 52px; margin-top: -6px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      .email { opacity: 1 !important; transform: none !important; transition: none; }
+      .email .email__sec, .email .grant { opacity: 1 !important; transform: none !important; }
+      .feature-row { opacity: 1 !important; transform: none !important; }
+      *, *::before, *::after { transition-duration: 0.001ms !important; }
+    }
+  </style>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+  <a class="skip-link" href="#intake">Skip to sign-up</a>
+
+  <!-- ============ HEADER ============ -->
+  <header class="site-header">
+    <div class="wrap header__inner">
+      <a class="brandmark" href="#top">GrantEquity</a>
+      <nav class="header__nav" aria-label="Site navigation">
+        <a class="header__signin" href="/login">Sign in</a>
+        <a class="header__cta" href="#intake">Sign up free →</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- ============ HERO (copy left / email mockup right) ============ -->
+  <section class="hero" id="top">
+    <div class="wrap hero__grid">
+      <div class="hero__copy">
+        <h1>Small nonprofits miss grants they qualify for. We fix that.</h1>
+        <p class="sub">Every Monday, we search foundation pages, county programs, and state portals — then email each organization the grants they actually qualify for. No cost, ever.</p>
+        <div class="cta-row">
+          <a class="btn" href="#intake">Sign up free</a>
+          <span class="cta-note"><svg class="sec-icon" width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="6.4" stroke="currentColor" stroke-width="1.5"/><path d="M8 4.6V8l2.4 1.6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Takes 2 minutes · Review matches in the app each week</span>
+        </div>
+      </div>
+      <div class="hero__preview">
+      <div class="email" id="email-preview" role="img" aria-label="Example of a GrantEquity weekly email">
+        <!-- sender -->
+        <div class="email__head">
+          <div class="email__avatar" aria-hidden="true">G</div>
+          <div class="email__meta">
+            <div class="email__from">GrantEquity <span>&lt;grants@grantequity.org&gt;</span></div>
+            <div class="email__to">to Bellhaven Community Kitchen · Passaic County</div>
+          </div>
+          <div class="email__date">Mon, Jun 29 · 7:00 AM</div>
+        </div>
+
+        <div class="email__subject">5 grants matched your org this week</div>
+        <div class="email__preview-text">2 closing soon, 3 new — including a statewide food-assistance grant…</div>
+
+        <!-- body -->
+        <div class="email__body">
+          <p class="email__greeting">Good morning. Here's what we found for Bellhaven Community Kitchen this week.</p>
+
+          <div class="email__sec email__sec--soon"><svg class="sec-icon" width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="6.4" stroke="currentColor" stroke-width="1.5"/><path d="M8 4.6V8l2.4 1.6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Closing soon</div>
+          <div class="grant">
+            <div class="grant__top">
+              <span class="grant__name">Dept. of Agriculture · Food Assistance Grant</span>
+              <span class="grant__amt">$12,500</span>
+            </div>
+            <div class="grant__meta">Pantry &amp; meal program support · Deadline Jul 18 <span class="grant__pill">3 weeks left</span></div>
+          </div>
+          <div class="grant">
+            <div class="grant__top">
+              <span class="grant__name">Passaic County Human Services Fund</span>
+              <span class="grant__amt">$5,000</span>
+            </div>
+            <div class="grant__meta">Local hunger-relief projects · Deadline Jul 24 <span class="grant__pill">4 weeks left</span></div>
+          </div>
+
+          <div class="email__sec">New this week</div>
+          <div class="grant">
+            <div class="grant__top">
+              <span class="grant__name">Community FoodBank · Partner Grant</span>
+              <span class="grant__amt">$10,000</span>
+            </div>
+            <div class="grant__meta">Food distribution capacity · Deadline Sep 18</div>
+          </div>
+          <div class="grant">
+            <div class="grant__top">
+              <span class="grant__name">Hyde and Watson Foundation</span>
+              <span class="grant__amt">$7,500</span>
+            </div>
+            <div class="grant__meta">Capital &amp; program support · Deadline Aug 15</div>
+          </div>
+          <div class="grant">
+            <div class="grant__top">
+              <span class="grant__name">Henry &amp; Marilyn Taub Foundation</span>
+              <span class="grant__amt">$15,000</span>
+            </div>
+            <div class="grant__meta">Basic needs &amp; food security · Deadline Aug 29</div>
+          </div>
+
+          <div class="email__footer">
+            You're receiving this because Bellhaven Community Kitchen signed up at grantequity.org.
+            <a href="#intake">Unsubscribe</a> anytime · Reply to this email to reach us at grants@grantequity.org.<br>
+            GrantEquity · a nonprofit project.
+          </div>
+        </div>
+      </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ MISSION STATEMENT ============ -->
+  <section class="mission">
+    <div class="wrap">
+      <p class="mission__text">GrantEquity is a nonprofit infrastructure project. We automate the grant discovery work that small organizations can't afford to staff — so they can focus on the work that actually matters.</p>
+    </div>
+  </section>
+
+  <!-- ============ THE PROBLEM (with scale stat folded in) ============ -->
+  <section class="prose">
+    <div class="wrap split">
+      <div class="split__head">
+        <span class="eyebrow">The problem</span>
+        <h2>Why small nonprofits miss grants.</h2>
+      </div>
+      <div class="split__body">
+        <div class="figure-stat">
+          <span class="figure-stat__num">1 million+</span>
+          <p class="figure-stat__desc">U.S. nonprofits operate on budgets under $50,000 — too small for paid grant tools, too busy to search manually.</p>
+          <span class="figure-stat__src">Sources: Urban Institute, National Center for Charitable Statistics, 2025; IRS Exempt Organizations Data, 2024</span>
+        </div>
+        <p>Grant discovery tools can cost up to $4,000 a year, and still require staff to manage them. Most small nonprofits have neither the budget nor the bandwidth. GrantEquity has no paid tier or paywall — a weekly email delivers your matches, and a free app lets you review fit scores and reasoning for each one.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ HOW IT WORKS ============ -->
+  <section class="prose howitworks">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="eyebrow">How it works</span>
+        <h2>Set it up once. It runs every week.</h2>
+      </div>
+      <div class="stepcards">
+        <div class="stepcard">
+          <div class="stepcard__num" aria-hidden="true">1</div>
+          <h3>Tell us about your org</h3>
+          <p>Your name, focus areas, county, and what you do. Two minutes, no account.</p>
+        </div>
+        <div class="stepcard">
+          <div class="stepcard__num" aria-hidden="true">2</div>
+          <h3>We search every Monday</h3>
+          <p>We check foundation pages, county programs, and state portals for grants your org qualifies for that week.</p>
+        </div>
+        <div class="stepcard">
+          <div class="stepcard__num" aria-hidden="true">3</div>
+          <h3>You get an email</h3>
+          <p>A short list of matching grants with amounts, deadlines, and links. Open the ones that fit and apply.</p>
+        </div>
+        <div class="stepcard">
+          <div class="stepcard__num" aria-hidden="true">4</div>
+          <h3>Review your matches</h3>
+          <p>Log in to see fit scores, eligibility flags, and your agent's reasoning for each grant. Mark what you'll apply to.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ PLATFORM FEATURES ============ -->
+  <section class="prose platform" aria-labelledby="platform-heading">
+    <div class="wrap split">
+      <div class="split__head">
+        <span class="eyebrow">In the app</span>
+        <h2 id="platform-heading">What you'll see in your matches dashboard.</h2>
+      </div>
+      <div class="split__body">
+        <div class="platform-features" id="platform-features">
+          <div class="feature-row">
+            <svg class="feature-icon" aria-hidden="true" viewBox="0 0 10 10" fill="currentColor"><circle cx="5" cy="5" r="5"/></svg>
+            <div class="feature-content">
+              <h3>Fit score</h3>
+              <p>A 0–100 score showing how well each grant matches your org's focus, size, and location.</p>
+            </div>
+          </div>
+          <div class="feature-row">
+            <svg class="feature-icon" aria-hidden="true" viewBox="0 0 10 10" fill="currentColor"><circle cx="5" cy="5" r="5"/></svg>
+            <div class="feature-content">
+              <h3>Eligibility flags</h3>
+              <p>Key requirements surfaced at a glance: budget caps, 501(c)(3) required, geographic limits.</p>
+            </div>
+          </div>
+          <div class="feature-row">
+            <svg class="feature-icon" aria-hidden="true" viewBox="0 0 10 10" fill="currentColor"><circle cx="5" cy="5" r="5"/></svg>
+            <div class="feature-content">
+              <h3>Agent reasoning</h3>
+              <p>A short explanation from the AI of why this grant is or isn't a match for you.</p>
+            </div>
+          </div>
+        </div>
+        <a class="btn btn--ghost" href="/login">Sign in to your matches →</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ WHY IT'S FREE ============ -->
+  <section class="prose whyfree">
+    <div class="wrap">
+      <div class="centerblock">
+        <span class="eyebrow">Why it's free</span>
+        <h2>No paid tier. No catch.</h2>
+        <p>GrantEquity runs as an automated weekly search, so sending you matching grants costs very little to keep going. There's no upgrade, no premium plan, and no paid tier — the version you sign up for is the whole thing, and it stays that way.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ INTAKE FORM (intro left / form right) ============ -->
+  <section class="intake" id="intake">
+    <div class="wrap split">
+      <div class="intake__head split__head">
+        <h2>Sign up for weekly grants.</h2>
+        <p>Tell us about your organization and your first email arrives the following Monday.</p>
+      </div>
+
+      <div class="intake__body split__body">
+      <form id="intake-form">
+        <div class="field">
+          <label for="org">Organization name</label>
+          <input type="text" id="org" name="org_name" required placeholder="e.g. Clearwater Neighbors Fund" />
+        </div>
+
+        <div class="field">
+          <label for="email">Contact email</label>
+          <input type="email" id="email" name="email" required placeholder="you@yourorg.org" />
+        </div>
+
+        <fieldset class="field">
+          <legend>What does your org focus on? <span class="hint">Select all that apply.</span></legend>
+          <div class="checkbox-grid" id="focus-areas-grid">
+            <label><input type="checkbox" name="focus_areas[]" value="Food Security"> Food Security</label>
+            <label><input type="checkbox" name="focus_areas[]" value="Environment &amp; Conservation"> Environment &amp; Conservation</label>
+            <label><input type="checkbox" name="focus_areas[]" value="Health &amp; Mental Health"> Health &amp; Mental Health</label>
+            <label><input type="checkbox" name="focus_areas[]" value="Education &amp; Literacy"> Education &amp; Literacy</label>
+            <label><input type="checkbox" name="focus_areas[]" value="Arts &amp; Culture"> Arts &amp; Culture</label>
+            <label><input type="checkbox" name="focus_areas[]" value="Housing &amp; Homelessness"> Housing &amp; Homelessness</label>
+            <label><input type="checkbox" name="focus_areas[]" value="Youth Development"> Youth Development</label>
+            <label><input type="checkbox" name="focus_areas[]" value="Senior Services"> Senior Services</label>
+            <label><input type="checkbox" name="focus_areas[]" value="Disability Services"> Disability Services</label>
+            <label><input type="checkbox" name="focus_areas[]" value="Immigration &amp; Refugee Services"> Immigration &amp; Refugee Services</label>
+            <label><input type="checkbox" name="focus_areas[]" value="Animal Welfare"> Animal Welfare</label>
+            <label><input type="checkbox" name="focus_areas[]" value="Capacity Building"> Capacity Building</label>
+          </div>
+          <p class="focus-error" id="focus-error">Please select at least one focus area.</p>
+        </fieldset>
+
+        <div class="field">
+          <label for="state">State</label>
+          <select id="state" name="state" required>
+            <option value="" disabled selected>Choose a state…</option>
+            <option>Alabama</option>
+            <option>Alaska</option>
+            <option>Arizona</option>
+            <option>Arkansas</option>
+            <option>California</option>
+            <option>Colorado</option>
+            <option>Connecticut</option>
+            <option>Delaware</option>
+            <option>Florida</option>
+            <option>Georgia</option>
+            <option>Hawaii</option>
+            <option>Idaho</option>
+            <option>Illinois</option>
+            <option>Indiana</option>
+            <option>Iowa</option>
+            <option>Kansas</option>
+            <option>Kentucky</option>
+            <option>Louisiana</option>
+            <option>Maine</option>
+            <option>Maryland</option>
+            <option>Massachusetts</option>
+            <option>Michigan</option>
+            <option>Minnesota</option>
+            <option>Mississippi</option>
+            <option>Missouri</option>
+            <option>Montana</option>
+            <option>Nebraska</option>
+            <option>Nevada</option>
+            <option>New Hampshire</option>
+            <option>New Jersey</option>
+            <option>New Mexico</option>
+            <option>New York</option>
+            <option>North Carolina</option>
+            <option>North Dakota</option>
+            <option>Ohio</option>
+            <option>Oklahoma</option>
+            <option>Oregon</option>
+            <option>Pennsylvania</option>
+            <option>Rhode Island</option>
+            <option>South Carolina</option>
+            <option>South Dakota</option>
+            <option>Tennessee</option>
+            <option>Texas</option>
+            <option>Utah</option>
+            <option>Vermont</option>
+            <option>Virginia</option>
+            <option>Washington</option>
+            <option>West Virginia</option>
+            <option>Wisconsin</option>
+            <option>Wyoming</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="county">Primary county served</label>
+          <input type="text" id="county" name="county" required placeholder="e.g. Passaic County, or your city / region" />
+        </div>
+
+        <div class="field">
+          <label for="is_501c3">Tax-exempt status</label>
+          <select id="is_501c3" name="is_501c3" required>
+            <option value="" disabled selected>Choose one…</option>
+            <option value="yes">Yes, we're a 501(c)(3)</option>
+            <option value="pending">Pending — application in progress</option>
+            <option value="no">No</option>
+          </select>
+        </div>
+
+        <div class="row-2">
+          <div class="field">
+            <label for="budget">Annual operating budget <span class="hint">(optional)</span></label>
+            <select id="budget" name="annual_budget">
+              <option value="prefer_not">Prefer not to say</option>
+              <option value="under_100k">Under $100K</option>
+              <option value="100k_500k">$100K – $500K</option>
+              <option value="500k_1m">$500K – $1M</option>
+              <option value="over_1m">Over $1M</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="grant_size_pref">What grant sizes are you looking for? <span class="hint">(optional)</span></label>
+            <select id="grant_size_pref" name="grant_size_pref">
+              <option value="any">Any size</option>
+              <option value="1k_10k">$1K – $10K</option>
+              <option value="10k_50k">$10K – $50K</option>
+              <option value="50k_250k">$50K – $250K</option>
+              <option value="250k_plus">$250K+</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="does">In one sentence, what does your org do?</label>
+          <textarea id="does" name="what_we_do" required placeholder="We provide free meals and pantry access to families in our county."></textarea>
+        </div>
+
+        <div class="field">
+          <label for="target_population">Who do you serve? <span class="hint">(optional)</span></label>
+          <input type="text" id="target_population" name="target_population" placeholder="Food-insecure families, seniors, working parents" />
+        </div>
+
+        <button type="submit" class="btn">Get my weekly grants →</button>
+        <p class="form-error" id="form-error">Something went wrong. Please email grants@grantequity.org and we'll set you up.</p>
+      </form>
+
+      <!-- success state -->
+      <div class="form-success" id="form-success">
+        <div class="check" aria-hidden="true">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M5 12.5L10 17.5L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <h3>You're in.</h3>
+        <p>Your first email arrives <strong>next Monday</strong>, from grants@grantequity.org. Keep an eye on your inbox — and check spam just in case.</p>
+      </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ FOOTER (brand left / contact right) ============ -->
+  <footer>
+    <div class="wrap footer__grid">
+      <div class="footer__brand">
+        <div class="brand">GrantEquity</div>
+        <p>A nonprofit project helping small nonprofits find funding the big platforms overlook.</p>
+        <p>Questions? <a href="mailto:grants@grantequity.org">grants@grantequity.org</a>. Your weekly grants come from the same address every Monday.</p>
+      </div>
+      <div class="footer__contact">
+        <div class="meta">
+          <a href="#top">grantequity.org</a>
+          <a href="mailto:grants@grantequity.org">grants@grantequity.org</a>
+        </div>
+        <p class="addr">GrantEquity · a nonprofit project. You can unsubscribe from any weekly email at any time.</p>
+      </div>
+    </div>
+    <div class="wrap">
+      <p class="footer__identity">GrantEquity is an independent nonprofit infrastructure project serving nonprofits nationwide.</p>
+    </div>
+  </footer>
+
+  <script>
+    const SUPABASE_URL = 'https://ujixxuvfpuykcmzcebmg.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqaXh4dXZmcHV5a2NtemNlYm1nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIzOTQ4MDAsImV4cCI6MjA5Nzk3MDgwMH0.GckAxe3pHOoGhAE07mnrCyW_uoMR8FCmRT0mrkZnsNk';
+    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    (function () {
+      "use strict";
+
+      var prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+      /* ---------- EMAIL MOCKUP FADE-IN (only motion on the page) ---------- */
+      var emailEl = document.getElementById("email-preview");
+      var platformFeaturesEl = document.getElementById("platform-features");
+
+      if (prefersReduced || !("IntersectionObserver" in window)) {
+        if (emailEl) emailEl.classList.add("in-view");
+        if (platformFeaturesEl) platformFeaturesEl.classList.add("in-view");
+      } else {
+        var io = new IntersectionObserver(function (entries) {
+          entries.forEach(function (entry) {
+            if (entry.isIntersecting) {
+              entry.target.classList.add("in-view");
+              io.unobserve(entry.target);
+            }
+          });
+        }, { threshold: 0.2 });
+        if (emailEl) io.observe(emailEl);
+        if (platformFeaturesEl) io.observe(platformFeaturesEl);
+      }
+
+      /* ---------- SUPABASE INSERT SUBMIT ---------- */
+      var form = document.getElementById("intake-form");
+      var success = document.getElementById("form-success");
+      var errorMsg = document.getElementById("form-error");
+
+      // Clear focus-area error when any checkbox is checked
+      var focusCheckboxes = document.querySelectorAll("input[name='focus_areas[]']");
+      var focusError = document.getElementById("focus-error");
+      focusCheckboxes.forEach(function (cb) {
+        cb.addEventListener("change", function () {
+          if (focusError && document.querySelector("input[name='focus_areas[]']:checked")) {
+            focusError.classList.remove("show");
+          }
+        });
+      });
+
+      if (form) {
+        form.addEventListener("submit", async function (e) {
+          e.preventDefault();
+          errorMsg.classList.remove("show");
+
+          // Collect focus_areas checkboxes
+          const focusCheckboxesChecked = form.querySelectorAll('input[name="focus_areas[]"]:checked');
+          const focusAreas = Array.from(focusCheckboxesChecked).map(cb => cb.value);
+
+          if (focusAreas.length === 0) {
+            // surface the dedicated inline error next to the checkbox group
+            if (focusError) {
+              focusError.classList.add("show");
+              var grid = document.getElementById("focus-areas-grid");
+              if (grid) grid.scrollIntoView({ behavior: prefersReduced ? "auto" : "smooth", block: "center" });
+            }
+            return;
+          }
+
+          // Map form fields to organizations table schema
+          const payload = {
+            name:              form.querySelector('[name="org_name"]').value.trim(),
+            email:             form.querySelector('[name="email"]').value.trim(),
+            focus_areas:       focusAreas,
+            state:             form.querySelector('[name="state"]').value,
+            county:            form.querySelector('[name="county"]').value.trim(),
+            is_501c3:          form.querySelector('[name="is_501c3"]').value === "yes",
+            annual_budget:     form.querySelector('[name="annual_budget"]').value,
+            grant_size_pref:   form.querySelector('[name="grant_size_pref"]').value,
+            what_we_do:        form.querySelector('[name="what_we_do"]').value.trim(),
+            target_population: form.querySelector('[name="target_population"]').value.trim() || null,
+            active:            true
+          };
+
+          // Disable submit button during request
+          const btn = form.querySelector('button[type="submit"]');
+          const originalText = btn.innerHTML;
+          btn.disabled = true;
+          btn.innerHTML = 'Submitting…';
+
+          try {
+            const { error } = await supabaseClient
+              .from('organizations')
+              .insert([payload]);
+
+            if (error) {
+              // Duplicate email — org already subscribed
+              if (error.code === '23505') {
+                form.style.display = "none";
+                success.querySelector('h3').textContent = "You're already in.";
+                success.querySelector('p').innerHTML =
+                  "We already have your org on file. Your grant emails come from grants@grantequity.org every Monday.";
+                success.classList.add("show");
+                success.scrollIntoView({ behavior: "smooth", block: "center" });
+                return;
+              }
+              throw error;
+            }
+
+            // Success
+            form.style.display = "none";
+            success.classList.add("show");
+            success.scrollIntoView({ behavior: "smooth", block: "center" });
+
+          } catch (err) {
+            console.error("Supabase insert error:", err);
+            errorMsg.textContent =
+              "Something went wrong. Please email grants@grantequity.org and we'll set you up.";
+            errorMsg.classList.add("show");
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+          }
+        });
+      }
+    })();
+  </script>
+</body>
+</html>

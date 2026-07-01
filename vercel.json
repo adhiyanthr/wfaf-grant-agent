@@ -1,0 +1,15 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "npm install && npm run build",
+  "env": {
+    "VITE_SUPABASE_URL": "@vite_supabase_url",
+    "VITE_SUPABASE_ANON_KEY": "@vite_supabase_anon_key"
+  },
+  "rewrites": [
+    { "source": "/login",         "destination": "/_app/index.html" },
+    { "source": "/profile",       "destination": "/_app/index.html" },
+    { "source": "/matches",       "destination": "/_app/index.html" },
+    { "source": "/matches/(.*)",  "destination": "/_app/index.html" }
+  ]
+}
+

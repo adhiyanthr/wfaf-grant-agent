@@ -1,0 +1,9 @@
+.DS_Store
+.git
+.gitignore
+.vercel
+node_modules
+*.bak
+*.md
+migration.sql
+organizations_rls.sql
