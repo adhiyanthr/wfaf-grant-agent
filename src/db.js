@@ -68,15 +68,44 @@ export async function getOrgByEmail(email) {
   return data;
 }
 
+// Recent in-app feedback for an org (buttons only, not 'message' rows), newest
+// first, for injection into the agent prompt. Lenient: a feedback read failure
+// must never block the weekly digest.
+export async function getRecentFeedbackForOrg(orgId, limit = 20) {
+  const { data, error } = await getClient()
+    .from('match_feedback')
+    .select('response, note, created_at, grants(title, funder, url)')
+    .eq('org_id', orgId)
+    .neq('response', 'message')
+    .not('response', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    console.error(`  feedback read failed (continuing without): ${error.message}`);
+    return [];
+  }
+  return data || [];
+}
+
 // Per-org dedup. A grant is suppressed if THIS org already has it within the
-// TTL window; grants closing within 30 days always surface.
-export async function filterNewGrantsForOrg(orgId, grants) {
+// TTL window; grants closing within 30 days always surface. Grants the org
+// explicitly marked not_relevant / already_applied are hard-dropped (belt and
+// suspenders on top of the prompt guidance).
+export async function filterNewGrantsForOrg(orgId, grants, feedback = []) {
   const { data: existing, error } = await getClient()
     .from('org_grants')
     .select('first_seen, grants!inner(url)')
     .eq('org_id', orgId);
 
   if (error) throw new Error(`Supabase read error (org_grants): ${error.message}`);
+
+  const blockedUrls = new Set(
+    feedback
+      .filter((fb) => fb.response === 'not_relevant' || fb.response === 'already_applied')
+      .map((fb) => fb.grants?.url)
+      .filter(Boolean)
+  );
 
   // url -> first_seen timestamp for grants this org has already been shown.
   const firstSeenByUrl = new Map(
@@ -94,6 +123,9 @@ export async function filterNewGrantsForOrg(orgId, grants) {
 
   return grants.filter((g) => {
     if (!g.url) return false;
+
+    // Explicit org feedback wins over everything, including closing-soon.
+    if (blockedUrls.has(g.url)) return false;
 
     // "Closing Soon" exception: deadline within 30 days always surfaces.
     const days = daysUntil(g.deadline);
@@ -152,7 +184,8 @@ export async function saveOrgGrants(orgId, grants) {
 
   // Link each grant to this org. org_grants.first_seen defaults to now() and is
   // left untouched on conflict (ignoreDuplicates) so the org's discovery date
-  // for a grant is preserved across weeks.
+  // for a grant is preserved across weeks — which also means a resurfaced
+  // annual grant keeps its original analysis.
   const orgRows = grants
     .filter((g) => g.id)
     .map((g) => ({
@@ -160,6 +193,8 @@ export async function saveOrgGrants(orgId, grants) {
       grant_id: g.id,
       fit_score: g.fit_score,
       fit_rationale: g.fit_rationale ?? null,
+      eligibility_flags: g.eligibility_flags ?? [],
+      analysis: g.analysis ?? null,
     }));
 
   if (orgRows.length) {

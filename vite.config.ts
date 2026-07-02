@@ -23,6 +23,7 @@ export default defineConfig({
       },
     },
   ],
+  base: '/_app/',
   build: {
     outDir: '_app',
     emptyOutDir: true,
