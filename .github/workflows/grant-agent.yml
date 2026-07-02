@@ -1,0 +1,49 @@
+name: GrantEquity Grant Agent
+
+on:
+  schedule:
+    # Monday at 14:00 UTC = 10:00 AM ET (summer / EDT = UTC-4)
+    # Adjust to 15:00 UTC in winter when EST = UTC-5
+    - cron: '0 14 * * 1'
+  workflow_dispatch:
+    # Manual trigger. Leave org_email blank to run ALL active orgs (same as the
+    # cron). Enter an org's email to send just that org a digest on demand
+    # (demos / mid-week onboarding).
+    inputs:
+      org_email:
+        description: 'Single org email to send to (blank = all active orgs)'
+        required: false
+        type: string
+
+jobs:
+  search-grants:
+    runs-on: ubuntu-latest
+    # Per-org web search is ~1–2 min/org; 60 min covers ~20 orgs sequentially.
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run grant agent
+        run: node src/index.js
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          # Single-org manual run; empty on the cron schedule (= all active orgs).
+          TARGET_ORG_EMAIL: ${{ github.event.inputs.org_email }}
+          # Non-secret config (set as repo Variables, not Secrets).
+          MAIL_FROM: ${{ vars.MAIL_FROM }}
+          UNSUBSCRIBE_BASE_URL: ${{ vars.UNSUBSCRIBE_BASE_URL }}
+          MAILING_ADDRESS: ${{ vars.MAILING_ADDRESS }}

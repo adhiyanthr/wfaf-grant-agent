@@ -1,16 +1,14 @@
-# Dependencies
-node_modules
-.pnp
-.pnp.js
+# Secrets — never commit
+.env
+.env.*
+!.env.example
 
-# Build
+# Dependencies
+node_modules/
+
+# Build outputs
 dist
 _app/assets
-
-# Environment
-.env
-.env.local
-.env.*.local
 
 # IDE
 .vscode
@@ -19,6 +17,13 @@ _app/assets
 *.swo
 *~
 
-# OS
+# OS / editor
 .DS_Store
+*.log
+
+# Vercel
 .vercel
+
+# Supabase CLI local state
+supabase/.branches/
+supabase/.temp/

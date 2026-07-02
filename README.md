@@ -1,94 +1,102 @@
-# GrantEquity App Setup
+# GrantEquity Grant Agent
 
-## Structure
+Automated weekly grant discovery for New Jersey nonprofits. Every Monday it runs
+a **per-org** Claude + web_search pass for each subscribed organization,
+deduplicates against Supabase, and emails each org a personalized digest via
+Resend. Orgs sign up through the GrantEquity landing page, which inserts them
+into the Supabase `organizations` table.
 
-- **`index.html`** — Landing page (static)
-- **`src/`** — React app source code (builds to `_app/`)
-  - `main.tsx` — App entry point
-  - `App.tsx` — Main router
-  - `pages/` — Page components (Login, Matches, Profile)
-  - `lib/` — Utilities (Supabase client, auth functions)
-  - `components/` — Reusable components (Nav)
-  - `index.css` — Styling
-- **`package.json`** — Dependencies and build scripts
-- **`vite.config.ts`** — Build configuration
-- **`vercel.json`** — Deployment configuration
+## How it works
+
+1. GitHub Actions fires Monday ~10am ET (or a manual single-org run on demand).
+2. For each **active** org, Claude (Sonnet 4.6) searches the web across federal,
+   NJ state, and foundation sources tailored to that org's focus areas + county.
+3. Results are scored against the org's profile and filtered to ≥6/10 fit.
+4. Grants are saved to the shared `grants` catalog and linked per-org in
+   `org_grants` (per-org dedup lives there).
+5. Resend delivers a formatted digest to the org, with a CAN-SPAM unsubscribe
+   footer + one-click `List-Unsubscribe` header.
+
+Data model:
+
+- **`organizations`** — subscribers (one row per signup); `active`, `last_sent`,
+  `unsubscribe_token`, `unsubscribed_at`.
+- **`grants`** — shared catalog, one row per unique `url`.
+- **`org_grants`** — join: which grant was shown to which org, with per-org
+  `fit_score`, `first_seen`, `digest_sent_at`.
+- **`email_events`** — Resend open/click/delivery webhook events (engagement).
 
 ## Setup
 
-### 1. Install dependencies
+### 1. Supabase
+
+Run, in order, in the SQL editor:
+- `schema.sql` (the shared `grants` table)
+- `migrations/per_org_engine.sql` (adds `org_grants`, `email_events`, and the
+  unsubscribe columns)
+
+Credentials: Supabase dashboard → Settings → API → Project URL + `service_role`
+key (server-side only — never ship it to the browser).
+
+### 2. Resend
+
+1. Sign up at resend.com (free tier: 3,000 emails/month).
+2. Add and **verify a custom sending domain** (e.g. `mail.grantequity.org`).
+   Real outreach needs DKIM/SPF — `onboarding@resend.dev` is test-only.
+3. Enable **Open & Click tracking** on the domain.
+4. Set `MAIL_FROM` to the verified address.
+
+### 3. Anthropic API key
+
+From console.anthropic.com → API Keys. Web search is ~$10 / 1,000 searches and
+each org uses ~5 searches/run, so ~$1–2 per org per run.
+
+### 4. Edge Functions (unsubscribe, confirmation, tracking)
+
+See [`supabase/functions/README.md`](supabase/functions/README.md) for deploy +
+wiring (DB webhook for confirmation, Resend webhook for tracking).
+
+### 5. GitHub repo config
+
+Secrets (Settings → Secrets → Actions):
+
+```
+ANTHROPIC_API_KEY
+SUPABASE_URL
+SUPABASE_SERVICE_KEY
+RESEND_API_KEY
+```
+
+Variables (Settings → Variables → Actions — non-secret):
+
+```
+MAIL_FROM                e.g. GrantEquity <grants@grantequity.org>
+UNSUBSCRIBE_BASE_URL     e.g. https://ujixxuvfpuykcmzcebmg.supabase.co/functions/v1
+MAILING_ADDRESS          physical postal address for the CAN-SPAM footer
+```
+
+## Running it
+
+- **Weekly (all active orgs):** the Monday cron, or Actions → *GrantEquity Grant
+  Agent* → *Run workflow* with the org email left blank.
+- **One org on demand (demo / mid-week onboarding):** Actions → *Run workflow* →
+  enter the org's email. (Maps to the `TARGET_ORG_EMAIL` env var.)
+
+## Local testing
 
 ```bash
+cp .env.example .env       # fill in real values
 npm install
+# All active orgs:
+node src/index.js
+# A single org:
+TARGET_ORG_EMAIL=org@example.com node src/index.js
 ```
 
-### 2. Set environment variables
+## Customization
 
-Create a `.env.local` file in the root directory:
-
-```
-VITE_SUPABASE_URL=https://your-project.supabase.co
-VITE_SUPABASE_ANON_KEY=your-anon-key-here
-```
-
-Get these from your Supabase project:
-- Go to **Settings** → **API**
-- Copy the Project URL and Anon Key
-
-### 3. Configure Supabase Auth
-
-In your Supabase dashboard:
-
-1. Go to **Authentication** → **URL Configuration**
-2. Add these redirect URLs:
-   - `https://grantequity.org/matches` (production)
-   - `http://localhost:5173/matches` (local development)
-
-### 4. Run locally
-
-```bash
-npm run dev
-```
-
-Visit `http://localhost:5173`
-
-### 5. Build for production
-
-```bash
-npm run build
-```
-
-This builds:
-- The React app to `_app/` (served at `/login`, `/matches`, `/profile`)
-- Keeps `index.html` at the root (landing page)
-
-## Deployment
-
-The app is deployed to Vercel. To deploy:
-
-1. Make sure all changes are committed
-2. Push to your deployment branch
-3. Vercel will automatically build and deploy
-
-Make sure these environment variables are set in Vercel:
-- `VITE_SUPABASE_URL`
-- `VITE_SUPABASE_ANON_KEY`
-
-## Features
-
-- **Magic link authentication** — Users sign in with their email
-- **Protected routes** — Matches and profile pages require authentication
-- **Grant dashboard** — Shows matching grants with fit scores
-- **User profile** — Displays organization information
-
-## Database
-
-The app queries the `organizations` table to fetch user organization data. This table is created and populated via the signup form on the landing page.
-
-## Key files to understand
-
-- `src/lib/supabase.ts` — Supabase client initialization
-- `src/lib/auth.ts` — Authentication functions (magic link)
-- `src/pages/Login.tsx` — Magic link sign-in flow
-- `src/pages/Matches.tsx` — Grant dashboard (currently uses sample data)
-- `vercel.json` — Routes `/login`, `/matches`, `/profile` to the app
+- **Per-org prompt / fit criteria**: `src/profile.js` (`buildSystemPrompt(org)`)
+- **Search angles**: `buildOrgSearches()` in `src/agent.js`
+- **Fit threshold**: `fit_score < 6` in `src/agent.js`
+- **Dedup windows**: `TTL_DAYS` / `CLOSING_SOON_DAYS` in `src/db.js`
+- **Schedule**: the cron in `.github/workflows/grant-agent.yml`
