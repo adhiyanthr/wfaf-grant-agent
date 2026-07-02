@@ -2,6 +2,7 @@ import { searchGrantsForOrg } from './agent.js';
 import {
   getActiveOrgs,
   getOrgByEmail,
+  getRecentFeedbackForOrg,
   filterNewGrantsForOrg,
   saveOrgGrants,
   markOrgDigestSent,
@@ -12,10 +13,13 @@ import { sendDigest } from './email.js';
 async function runForOrg(org) {
   console.log(`\n[${org.email}] ${org.name} — starting`);
 
-  const grants = await searchGrantsForOrg(org);
+  const feedback = await getRecentFeedbackForOrg(org.id);
+  if (feedback.length) console.log(`  ${feedback.length} feedback item(s) injected into prompt`);
+
+  const grants = await searchGrantsForOrg(org, feedback);
   console.log(`  ${grants.length} qualifying grants from search`);
 
-  const newGrants = await filterNewGrantsForOrg(org.id, grants);
+  const newGrants = await filterNewGrantsForOrg(org.id, grants, feedback);
   console.log(`  ${newGrants.length} are new for this org`);
 
   if (!newGrants.length) {

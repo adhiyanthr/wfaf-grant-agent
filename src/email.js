@@ -105,6 +105,8 @@ function buildGrantCard(g, urgent) {
         ${g.fit_rationale || ''}
       </p>
 
+      ${g.eligibility_flags?.length ? `<p style="margin: 4px 0 8px; font-size: 12px; color: #92500a;">⚠️ ${g.eligibility_flags.join(' · ')}</p>` : ''}
+
       ${tags ? `<p style="margin: 4px 0 8px; font-size: 12px; color: #888;">${tags}</p>` : ''}
 
       <a href="${g.url}" style="

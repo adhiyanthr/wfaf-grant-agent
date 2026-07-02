@@ -1,16 +1,18 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { buildSystemPrompt } from './profile.js';
+import { buildSystemPrompt, stateLabel } from './profile.js';
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 // Funder-type dimension — one selected per week via (week % length) so that
 // federal / state / corporate / private all get coverage across weeks.
-const FUNDER_SEARCHES = [
-  'federal grants available NJ nonprofits',
-  'NJ state grants nonprofits',
-  'corporate foundation grants NJ',
-  'private foundation grants NJ nonprofits',
-];
+function funderSearches(state) {
+  return [
+    `federal grants available ${state} nonprofits`,
+    `${state} state grants nonprofits`,
+    `corporate foundation grants ${state}`,
+    `private foundation grants ${state} nonprofits`,
+  ];
+}
 
 // ISO 8601 week number (1–53). JS has no built-in getWeek().
 function getISOWeek(date) {
@@ -30,29 +32,32 @@ function buildOrgSearches(org, now) {
   const year = now.getFullYear();
 
   const focusAreas = (org.focus_areas || []).filter(Boolean);
-  const county = org.county ? `${org.county} County NJ` : 'New Jersey';
+  const state = stateLabel(org);
+  const county = org.county ? `${org.county} County ${state}` : state;
 
   const searches = [
-    `NJ nonprofit grants deadline ${month} ${year}`,
+    `${state} nonprofit grants deadline ${month} ${year}`,
     `${county} nonprofit grants ${year}`,
   ];
 
   if (focusAreas.length) {
     for (const area of focusAreas.slice(0, 3)) {
-      searches.push(`${area} grants NJ nonprofits ${year}`);
+      searches.push(`${area} grants ${state} nonprofits ${year}`);
     }
   } else {
-    searches.push(`grants for NJ nonprofits ${year}`);
+    searches.push(`grants for ${state} nonprofits ${year}`);
   }
 
-  searches.push(FUNDER_SEARCHES[week % FUNDER_SEARCHES.length]);
+  const funders = funderSearches(state);
+  searches.push(funders[week % funders.length]);
 
   return { week, searches };
 }
 
 // Run one Claude web-search pass for a single organization and return its
-// scored, validated grants.
-export async function searchGrantsForOrg(org) {
+// scored, validated grants. `feedback` is recent in-app match feedback
+// (getRecentFeedbackForOrg) injected into the system prompt.
+export async function searchGrantsForOrg(org, feedback = []) {
   const runDate = new Date();
   const today = runDate.toISOString().split('T')[0];
   const { week, searches } = buildOrgSearches(org, runDate);
@@ -64,7 +69,9 @@ export async function searchGrantsForOrg(org) {
 
   const response = await client.messages.create({
     model: 'claude-sonnet-4-6',
-    max_tokens: 4096,
+    // Structured analysis per grant makes the JSON materially longer; 4096
+    // risked truncation (which breaks the [...] extraction below).
+    max_tokens: 8192,
     tools: [
       {
         type: 'web_search_20250305',
@@ -72,7 +79,7 @@ export async function searchGrantsForOrg(org) {
         max_uses: 15,
       },
     ],
-    system: buildSystemPrompt(org),
+    system: buildSystemPrompt(org, feedback),
     messages: [
       {
         role: 'user',
@@ -81,7 +88,7 @@ export async function searchGrantsForOrg(org) {
 Run these ${searches.length} web searches this week, then compile the results:
 ${searchList}
 
-Search thoroughly for all open grants that ${org.name} qualifies for. Cover federal, NJ state, and private foundation sources relevant to its focus areas. Only include grants with future deadlines or upcoming open cycles.
+Search thoroughly for all open grants that ${org.name} qualifies for. Cover federal, ${stateLabel(org)} state, and private foundation sources relevant to its focus areas. Only include grants with future deadlines or upcoming open cycles.
 
 For each grant, extract the application deadline if it is mentioned. Return it as an ISO date string (YYYY-MM-DD). If no deadline is mentioned, return null. Do not invent deadlines.
 
@@ -140,6 +147,27 @@ Return results as a raw JSON array only — no text, no markdown.`,
         return false;
       }
     }
+
+    // New analysis fields are best-effort: sanitize, never reject the grant.
+    g.eligibility_flags = Array.isArray(g.eligibility_flags)
+      ? g.eligibility_flags.filter((f) => typeof f === 'string')
+      : [];
+    if (
+      !g.analysis ||
+      typeof g.analysis !== 'object' ||
+      !Array.isArray(g.analysis.strengths)
+    ) {
+      g.analysis = null;
+    } else {
+      g.analysis = {
+        strengths: g.analysis.strengths.filter((s) => typeof s === 'string'),
+        considerations: Array.isArray(g.analysis.considerations)
+          ? g.analysis.considerations.filter((c) => typeof c === 'string')
+          : [],
+      };
+      if (!g.analysis.strengths.length) g.analysis = null;
+    }
+
     return true;
   });
 

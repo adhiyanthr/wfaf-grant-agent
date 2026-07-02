@@ -304,3 +304,26 @@ label {
     transform: rotate(360deg);
   }
 }
+
+.chip {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--accent);
+  background: var(--accent-tint);
+  border: 1px solid #d3e3e4;
+  padding: 2px 9px;
+  border-radius: 999px;
+}
+
+.chip--warn {
+  color: var(--warn-ink);
+  background: var(--warn-bg);
+  border-color: var(--warn-line);
+}
+
+.btn--ghost[aria-pressed="true"] {
+  background: var(--accent);
+  color: #fff;
+}

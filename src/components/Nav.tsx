@@ -37,7 +37,7 @@ export function Nav() {
       <div className="nav-links">
         {!isLoading && user ? (
           <>
-            <a href="/matches" className={window.location.pathname === '/matches' ? 'active' : ''}>
+            <a href="/matches" className={window.location.pathname.startsWith('/matches') ? 'active' : ''}>
               My Matches
             </a>
             <a href="/profile" className={window.location.pathname === '/profile' ? 'active' : ''}>

@@ -1,6 +1,6 @@
 # GrantEquity Edge Functions
 
-Three Deno/TypeScript functions deployed to the Supabase project. All are
+Four Deno/TypeScript functions deployed to the Supabase project. All are
 public HTTP endpoints (no Supabase JWT) — each authenticates itself:
 
 | Function               | Purpose                                          | Auth                              |
@@ -8,6 +8,7 @@ public HTTP endpoints (no Supabase JWT) — each authenticates itself:
 | `unsubscribe`          | One-click + link unsubscribe (CAN-SPAM)          | Unguessable per-org token in URL  |
 | `signup-confirmation`  | "You're in" email on new signup                  | `x-webhook-secret` shared header  |
 | `resend-webhook`       | Records delivered/opened/clicked → `email_events`| Svix signature (Resend)           |
+| `feedback-notify`      | Emails grants@ on in-app feedback/messages       | `x-webhook-secret` shared header  |
 
 ## One-time setup
 
@@ -23,6 +24,7 @@ supabase secrets set \
   UNSUBSCRIBE_BASE_URL='https://ujixxuvfpuykcmzcebmg.supabase.co/functions/v1' \
   MAILING_ADDRESS='GrantEquity, PO Box 000, Somewhere, NJ 07000' \
   CONFIRM_WEBHOOK_SECRET="$(openssl rand -hex 16)" \
+  FEEDBACK_WEBHOOK_SECRET="$(openssl rand -hex 16)" \
   RESEND_WEBHOOK_SECRET=whsec_...    # from the Resend webhook dashboard
 ```
 
@@ -34,6 +36,7 @@ supabase secrets set \
 supabase functions deploy unsubscribe          --no-verify-jwt
 supabase functions deploy signup-confirmation  --no-verify-jwt
 supabase functions deploy resend-webhook       --no-verify-jwt
+supabase functions deploy feedback-notify      --no-verify-jwt
 ```
 
 ## Wire up the triggers
@@ -52,6 +55,11 @@ supabase functions deploy resend-webhook       --no-verify-jwt
 
 3. **Unsubscribe** — no trigger; the link is built into every digest footer and
    the `List-Unsubscribe` header by the agent (`src/email.js`).
+
+4. **Feedback notifications** — Supabase Dashboard → Database → Webhooks → *Create*:
+   - Table `match_feedback`, event **INSERT**.
+   - Type **Supabase Edge Functions** → `feedback-notify`.
+   - Add HTTP header `x-webhook-secret: <FEEDBACK_WEBHOOK_SECRET>`.
 
 ## Quick checks
 

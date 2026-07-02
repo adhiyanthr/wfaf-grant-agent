@@ -1,47 +1,95 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import {
+  Match,
+  fetchOrgByEmail,
+  fetchMatches,
+  displayScore,
+  formatAmount,
+  daysUntil,
+} from '../lib/matches'
 
-const SAMPLE_GRANTS = [
-  {
-    id: 1,
-    title: 'Community Food Security Grant',
-    funder: 'The Kellogg Foundation',
-    deadline: '2026-07-31',
-    amount: '$25,000 - $100,000',
-    url: 'https://foundation.example.com',
-    eligibility: 'Nonprofits serving food-insecure communities',
-    fit_score: 95,
-  },
-  {
-    id: 2,
-    title: 'Local Food Systems Initiative',
-    funder: 'State Department of Agriculture',
-    deadline: '2026-08-15',
-    amount: '$10,000 - $50,000',
-    url: 'https://agriculture.example.com',
-    eligibility: 'Community organizations in underserved areas',
-    fit_score: 88,
-  },
-  {
-    id: 3,
-    title: 'Nutrition Education Program Grant',
-    funder: 'Healthy Futures Foundation',
-    deadline: '2026-09-30',
-    amount: '$5,000 - $30,000',
-    url: 'https://healthyfutures.example.com',
-    eligibility: 'Organizations focusing on nutrition access',
-    fit_score: 82,
-  },
-]
+function GrantCard({ match }: { match: Match }) {
+  const g = match.grants
+  const days = daysUntil(g.deadline)
+  const amount = formatAmount(g.amount_min, g.amount_max)
+
+  return (
+    <div className="grant-card">
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'start',
+          marginBottom: '8px',
+        }}
+      >
+        <div style={{ flex: 1 }}>
+          <h3>{g.title}</h3>
+          {g.funder && <p className="muted">{g.funder}</p>}
+        </div>
+        <div style={{ textAlign: 'right', marginLeft: '16px' }}>
+          <div style={{ fontSize: '1.5rem', fontWeight: 600, color: 'var(--accent)' }}>
+            {displayScore(match.fit_score)}
+          </div>
+          <div style={{ fontSize: '0.75rem', color: 'var(--ink-3)' }}>match score</div>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', gap: '20px', marginBottom: '12px', flexWrap: 'wrap' }}>
+        <div>
+          <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--ink-3)' }}>
+            Deadline
+          </div>
+          <div style={{ fontWeight: 600 }}>
+            {g.deadline
+              ? `${new Date(g.deadline).toLocaleDateString()}${days != null ? ` (${days}d)` : ''}`
+              : 'Not listed'}
+          </div>
+        </div>
+        {amount && (
+          <div>
+            <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--ink-3)' }}>
+              Award
+            </div>
+            <div style={{ fontWeight: 600 }}>{amount}</div>
+          </div>
+        )}
+      </div>
+
+      {match.fit_rationale && <p>{match.fit_rationale}</p>}
+
+      {g.tags && g.tags.length > 0 && (
+        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '10px' }}>
+          {g.tags.map((tag) => (
+            <span key={tag} className="chip">
+              {tag}
+            </span>
+          ))}
+        </div>
+      )}
+
+      <div style={{ display: 'flex', gap: '10px', marginTop: '14px', flexWrap: 'wrap' }}>
+        <a href={`/matches/${match.grant_id}`} className="btn">
+          View details →
+        </a>
+        <a href={g.url} target="_blank" rel="noopener noreferrer" className="btn btn--ghost">
+          Apply ↗
+        </a>
+      </div>
+    </div>
+  )
+}
 
 export function Matches() {
   const [user, setUser] = useState<any>(null)
   const [org, setOrg] = useState<any>(null)
+  const [matches, setMatches] = useState<Match[]>([])
   const [loading, setLoading] = useState(true)
-  const [grants] = useState(SAMPLE_GRANTS)
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   useEffect(() => {
-    const checkAuth = async () => {
+    const load = async () => {
       const { data: { session } } = await supabase.auth.getSession()
 
       if (!session?.user) {
@@ -52,21 +100,20 @@ export function Matches() {
       setUser(session.user)
 
       try {
-        const { data } = await supabase
-          .from('organizations')
-          .select('*')
-          .eq('email', session.user.email)
-          .single()
-
-        setOrg(data)
+        const orgData = await fetchOrgByEmail(session.user.email!)
+        setOrg(orgData)
+        if (orgData) {
+          setMatches(await fetchMatches(orgData.id))
+        }
       } catch (err) {
-        console.error('Failed to fetch organization:', err)
+        console.error('Failed to load matches:', err)
+        setLoadError('We had trouble loading your matches. Please refresh, or email grants@grantequity.org.')
       }
 
       setLoading(false)
     }
 
-    checkAuth()
+    load()
   }, [])
 
   if (loading) {
@@ -82,85 +129,66 @@ export function Matches() {
     return null
   }
 
-  const daysUntilDeadline = (deadline: string) => {
-    const today = new Date()
-    const deadlineDate = new Date(deadline)
-    const diff = Math.ceil(
-      (deadlineDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+  if (!org) {
+    return (
+      <div className="container">
+        <div className="card" style={{ textAlign: 'center' }}>
+          <h2 style={{ marginBottom: '10px' }}>We don't have an organization on file for {user.email}</h2>
+          <p className="muted" style={{ marginBottom: '16px' }}>
+            Sign up with this email on the homepage, or reach us and we'll connect your account.
+          </p>
+          <a href="/" className="btn">Go to sign-up</a>
+        </div>
+      </div>
     )
-    return diff
   }
+
+  const closingSoon = matches
+    .filter((m) => {
+      const d = daysUntil(m.grants.deadline)
+      return d != null && d >= 0 && d <= 30
+    })
+    .sort((a, b) => (daysUntil(a.grants.deadline) ?? 0) - (daysUntil(b.grants.deadline) ?? 0))
+  const rest = matches.filter((m) => !closingSoon.includes(m))
 
   return (
     <div className="container">
-      <h1 style={{ marginBottom: '8px' }}>Grant matches for {org?.name || 'you'}</h1>
+      <h1 style={{ marginBottom: '8px' }}>Grant matches for {org.name || 'you'}</h1>
       <p style={{ marginBottom: '32px', color: 'var(--ink-2)' }}>
-        {org?.email && `${org.email} ${org.state ? `• ${org.state}` : ''}`}
+        {org.email} {org.state ? `• ${org.state}` : ''}
       </p>
 
-      <div style={{ marginBottom: '40px' }}>
-        <h2 style={{ marginBottom: '20px', fontSize: '1.5rem' }}>
-          🔥 Closing soon (next 30 days)
-        </h2>
+      {loadError && <div className="alert error">{loadError}</div>}
 
-        {grants.map((grant) => (
-          <div key={grant.id} className="grant-card">
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'start',
-                marginBottom: '8px',
-              }}
-            >
-              <div style={{ flex: 1 }}>
-                <h3>{grant.title}</h3>
-                <p className="muted">{grant.funder}</p>
-              </div>
-              <div
-                style={{
-                  textAlign: 'right',
-                  marginLeft: '16px',
-                }}
-              >
-                <div style={{ fontSize: '1.5rem', fontWeight: 600, color: 'var(--accent)' }}>
-                  {grant.fit_score}%
-                </div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--ink-3)' }}>match score</div>
-              </div>
-            </div>
+      {!loadError && matches.length === 0 && (
+        <div className="card" style={{ textAlign: 'center' }}>
+          <h2 style={{ marginBottom: '10px' }}>Your first matches arrive Monday</h2>
+          <p className="muted">
+            Our agent searches foundation, county, and state sources every Monday morning and your
+            matches will show up here (and in your inbox).
+          </p>
+        </div>
+      )}
 
-            <div style={{ display: 'flex', gap: '20px', marginBottom: '12px', flexWrap: 'wrap' }}>
-              <div>
-                <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--ink-3)' }}>
-                  Deadline
-                </div>
-                <div style={{ fontWeight: 600 }}>
-                  {new Date(grant.deadline).toLocaleDateString()} ({daysUntilDeadline(grant.deadline)}d)
-                </div>
-              </div>
-              <div>
-                <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--ink-3)' }}>
-                  Award
-                </div>
-                <div style={{ fontWeight: 600 }}>{grant.amount}</div>
-              </div>
-            </div>
+      {closingSoon.length > 0 && (
+        <div style={{ marginBottom: '40px' }}>
+          <h2 style={{ marginBottom: '20px', fontSize: '1.5rem' }}>
+            🔥 Closing soon (next 30 days)
+          </h2>
+          {closingSoon.map((m) => (
+            <GrantCard key={m.grant_id} match={m} />
+          ))}
+        </div>
+      )}
 
-            <p>{grant.eligibility}</p>
-
-            <a
-              href={grant.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn"
-              style={{ marginTop: '12px' }}
-            >
-              View details →
-            </a>
-          </div>
-        ))}
-      </div>
+      {rest.length > 0 && (
+        <div style={{ marginBottom: '40px' }}>
+          <h2 style={{ marginBottom: '20px', fontSize: '1.5rem' }}>All matches</h2>
+          {rest.map((m) => (
+            <GrantCard key={m.grant_id} match={m} />
+          ))}
+        </div>
+      )}
 
       <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--ink-2)' }}>
         <p>New grants are added every Monday morning.</p>

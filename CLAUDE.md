@@ -45,7 +45,8 @@ TARGET_ORG_EMAIL=x@y.com node src/index.js # single org
   `RESEND_API_KEY`.
 - GitHub **Variables:** `MAIL_FROM`, `UNSUBSCRIBE_BASE_URL`, `MAILING_ADDRESS`.
 - Function secrets (set via `supabase secrets set`): `CONFIRM_WEBHOOK_SECRET`,
-  `RESEND_WEBHOOK_SECRET`, `MAIL_FROM`, `RESEND_API_KEY`, `UNSUBSCRIBE_BASE_URL`.
+  `RESEND_WEBHOOK_SECRET`, `FEEDBACK_WEBHOOK_SECRET`, `MAIL_FROM`, `RESEND_API_KEY`,
+  `UNSUBSCRIBE_BASE_URL`.
 
 ## Known open items
 - `MAILING_ADDRESS` is unset (CAN-SPAM needs a real physical address before real sends).
