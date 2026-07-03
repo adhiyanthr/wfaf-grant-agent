@@ -6,6 +6,7 @@ import { Matches } from './pages/Matches'
 import { MatchDetail } from './pages/MatchDetail'
 import { Settings } from './pages/Settings'
 import { NotFound } from './pages/NotFound'
+import { TokenDashboard } from './pages/TokenDashboard'
 
 function App() {
   const [page, setPage] = useState('')
@@ -22,6 +23,15 @@ function App() {
     window.addEventListener('popstate', handlePopState)
     return () => window.removeEventListener('popstate', handlePopState)
   }, [])
+
+  // The token-gated dashboard is a self-contained, session-free view. It must
+  // NOT render <Nav> (which calls supabase.auth and shows sign-in chrome) — the
+  // token IS the credential. Branch out before anything auth-aware renders.
+  if (page.startsWith('/dashboard/')) {
+    const token = page.split('/')[2]
+    if (token) return <TokenDashboard token={token} />
+    return <NotFound />
+  }
 
   const renderPage = () => {
     if (page.startsWith('/matches/')) {
