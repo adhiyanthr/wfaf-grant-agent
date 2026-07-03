@@ -74,6 +74,31 @@ export async function updateOwnOrg(orgId: string, fields: Partial<OrgRow>) {
   if (error) throw error
 }
 
+// Kicks off an on-demand agent run for this org via the trigger-search edge
+// function. Resolves on success; throws an Error whose `.code` is the function's
+// structured reason (e.g. 'not_configured') so the UI can explain what happened.
+export async function triggerSearch(): Promise<void> {
+  const { data, error } = await supabase.functions.invoke('trigger-search', { body: {} })
+  if (error) {
+    let code = 'failed'
+    try {
+      const ctx = (error as any)?.context
+      if (ctx && typeof ctx.json === 'function') {
+        const body = await ctx.json()
+        if (body?.error) code = body.error
+      }
+    } catch { /* ignore parse issues */ }
+    const e = new Error(code) as Error & { code: string }
+    e.code = code
+    throw e
+  }
+  if (data && (data as any).error) {
+    const e = new Error((data as any).error) as Error & { code: string }
+    e.code = (data as any).error
+    throw e
+  }
+}
+
 export async function fetchMatches(orgId: string): Promise<Match[]> {
   const { data, error } = await supabase
     .from('org_grants')

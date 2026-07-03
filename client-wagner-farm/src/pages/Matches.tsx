@@ -4,6 +4,7 @@ import {
   Match,
   fetchOwnOrg,
   fetchMatches,
+  triggerSearch,
   displayScore,
   formatAmount,
   daysUntil,
@@ -88,6 +89,33 @@ export function Matches() {
   const [matches, setMatches] = useState<Match[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [refreshing, setRefreshing] = useState(false)
+  const [refreshMsg, setRefreshMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
+
+  const handleRefresh = async () => {
+    if (!window.confirm('Run a fresh grant search now? New matches usually appear within a few minutes.')) {
+      return
+    }
+    setRefreshing(true)
+    setRefreshMsg(null)
+    try {
+      await triggerSearch()
+      setRefreshMsg({
+        kind: 'ok',
+        text: 'Search started. New matches usually arrive within a few minutes — reload this page shortly to see them.',
+      })
+    } catch (err) {
+      const code = (err as any)?.code
+      setRefreshMsg({
+        kind: 'err',
+        text:
+          code === 'not_configured'
+            ? "On-demand refresh isn't switched on yet. Your matches still update automatically every Monday."
+            : 'Could not start a search just now. Please try again in a moment.',
+      })
+    }
+    setRefreshing(false)
+  }
 
   useEffect(() => {
     const load = async () => {
@@ -190,7 +218,16 @@ export function Matches() {
           </div>
           <div style={{ fontWeight: 600 }}>{formatDateTime(nextMondayRun())}</div>
         </div>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center' }}>
+          <button className="btn btn--ghost" onClick={handleRefresh} disabled={refreshing}>
+            {refreshing ? 'Starting…' : 'Refresh matches now'}
+          </button>
+        </div>
       </div>
+
+      {refreshMsg && (
+        <div className={`alert ${refreshMsg.kind === 'ok' ? 'success' : 'error'}`}>{refreshMsg.text}</div>
+      )}
 
       {loadError && <div className="alert error">{loadError}</div>}
 
