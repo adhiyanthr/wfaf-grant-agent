@@ -42,7 +42,7 @@ export async function fetchOrgByEmail(email: string) {
   const { data, error } = await supabase
     .from('organizations')
     .select('*')
-    .eq('email', email)
+    .eq('email', email.trim().toLowerCase())
     .maybeSingle()
   if (error) throw error
   return data
