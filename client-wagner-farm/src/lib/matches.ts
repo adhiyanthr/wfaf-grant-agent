@@ -34,18 +34,44 @@ export interface FeedbackRow {
   created_at: string
 }
 
+export interface OrgRow {
+  id: string
+  name: string | null
+  email: string | null
+  focus_areas: string[] | null
+  county: string | null
+  state: string | null
+  is_501c3: boolean | null
+  annual_budget: string | null
+  grant_size_pref: string | null
+  what_we_do: string | null
+  target_population: string | null
+  last_sent: string | null
+}
+
 const MATCH_SELECT =
   'grant_id, fit_score, fit_rationale, eligibility_flags, analysis, first_seen, ' +
   'grants(id, title, funder, amount_min, amount_max, deadline, url, tags)'
 
-export async function fetchOrgByEmail(email: string) {
+// This app is single-tenant: the signed-in user owns exactly one org row,
+// linked via organizations.auth_user_id (not email — see RLS "owner can
+// select/update own org").
+export async function fetchOwnOrg(userId: string): Promise<OrgRow | null> {
   const { data, error } = await supabase
     .from('organizations')
     .select('*')
-    .eq('email', email.trim().toLowerCase())
+    .eq('auth_user_id', userId)
     .maybeSingle()
   if (error) throw error
   return data
+}
+
+export async function updateOwnOrg(orgId: string, fields: Partial<OrgRow>) {
+  const { error } = await supabase
+    .from('organizations')
+    .update(fields)
+    .eq('id', orgId)
+  if (error) throw error
 }
 
 export async function fetchMatches(orgId: string): Promise<Match[]> {
@@ -95,7 +121,7 @@ export async function submitFeedback(
   if (error) throw error
 }
 
-// DB stores fit 1-10; the app (and landing page) speak 0-100.
+// DB stores fit 1-10; the app speaks 0-100.
 export function displayScore(fit: number | null): string {
   return fit == null ? '—' : `${fit * 10}%`
 }

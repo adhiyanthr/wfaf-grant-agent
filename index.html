@@ -963,8 +963,9 @@
         <div class="check" aria-hidden="true">
           <svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M5 12.5L10 17.5L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </div>
-        <h3>You're in.</h3>
-        <p>Your first email arrives <strong>next Monday</strong>, from grants@grantequity.org. Keep an eye on your inbox — and check spam just in case.</p>
+        <h3 id="form-success-title">You're in.</h3>
+        <p id="form-success-body">Your first email arrives <strong>next Monday</strong>, from grants@grantequity.org. Keep an eye on your inbox — and check spam just in case.</p>
+        <a class="btn" id="form-success-signin" href="https://grantequity.org/login" style="display:none; margin-top:1.4rem;">Sign in →</a>
       </div>
       </div>
     </div>
@@ -1057,9 +1058,13 @@
           }
 
           // Map form fields to organizations table schema
+          // Email is lowercased so it matches consistently against Supabase
+          // Auth (which normalizes magic-link emails to lowercase) and so the
+          // case-insensitive unique index catches "Jane@Org.com" vs
+          // "jane@org.com" as the same signup.
           const payload = {
             name:              form.querySelector('[name="org_name"]').value.trim(),
-            email:             form.querySelector('[name="email"]').value.trim(),
+            email:             form.querySelector('[name="email"]').value.trim().toLowerCase(),
             focus_areas:       focusAreas,
             state:             form.querySelector('[name="state"]').value,
             county:            form.querySelector('[name="county"]').value.trim(),
@@ -1083,12 +1088,15 @@
               .insert([payload]);
 
             if (error) {
-              // Duplicate email — org already subscribed
+              // Duplicate email — org already subscribed. Point them to sign
+              // in rather than implying a fresh signup succeeded, so they
+              // don't think a second org was created.
               if (error.code === '23505') {
                 form.style.display = "none";
-                success.querySelector('h3').textContent = "You're already in.";
-                success.querySelector('p').innerHTML =
-                  "We already have your org on file. Your grant emails come from grants@grantequity.org every Monday.";
+                success.querySelector('#form-success-title').textContent = "This email is already registered.";
+                success.querySelector('#form-success-body').innerHTML =
+                  "An organization is already signed up with this email. Sign in to view your matches, or email grants@grantequity.org if this doesn't look right.";
+                success.querySelector('#form-success-signin').style.display = "inline-flex";
                 success.classList.add("show");
                 success.scrollIntoView({ behavior: "smooth", block: "center" });
                 return;

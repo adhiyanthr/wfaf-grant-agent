@@ -24,30 +24,47 @@ function confirmationHtml(org: any): string {
   const address = Deno.env.get('MAILING_ADDRESS') ?? '';
 
   return `
-  <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:560px;margin:0 auto;padding:24px 16px;color:#1a1a1a;">
-    <div style="border-bottom:3px solid #2d6a4f;padding-bottom:16px;margin-bottom:20px;">
-      <h1 style="margin:0;color:#2d6a4f;font-size:22px;">🌱 You're in, ${name}!</h1>
+  <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px 16px;color:#16212b;">
+    <div style="display:flex;align-items:center;gap:12px;border-bottom:1px solid #e6e9ed;padding-bottom:18px;margin-bottom:22px;">
+      <span style="display:inline-block;width:40px;height:40px;border-radius:50%;background:#15616d;color:#fff;text-align:center;line-height:40px;font-size:20px;font-weight:600;">G</span>
+      <span style="font-size:18px;font-weight:600;color:#16212b;">GrantEquity</span>
     </div>
-    <p style="font-size:15px;line-height:1.6;">
+
+    <h1 style="margin:0 0 14px;color:#16212b;font-size:22px;line-height:1.2;">You're in, ${name}.</h1>
+
+    <p style="font-size:15px;line-height:1.65;color:#16212b;">
       Thanks for signing up for <strong>GrantEquity</strong> — a free service that finds
-      grant opportunities for New Jersey nonprofits.
+      the grants small nonprofits actually qualify for.
     </p>
-    <p style="font-size:15px;line-height:1.6;">
-      Your first personalized grant digest will arrive <strong>this coming Monday</strong>,
-      and every Monday after that. We search federal, NJ state, and foundation sources
-      matched to your focus areas, and send you only the grants worth your time.
+    <p style="font-size:15px;line-height:1.65;color:#16212b;">
+      Your first personalized set of matches arrives <strong>this coming Monday</strong>, and
+      every Monday after that. Each week we search foundation, county, and state sources
+      matched to your focus areas and location, and send you only the grants worth your time.
     </p>
-    <p style="font-size:15px;line-height:1.6;color:#555;">
-      Nothing else to do for now — keep an eye on your inbox Monday morning.
+    <p style="font-size:15px;line-height:1.65;color:#5a6775;">
+      Want to see fit scores, eligibility flags, and the reasoning behind each match? You can
+      review everything in the app anytime.
     </p>
-    <div style="border-top:1px solid #e0e0e0;margin-top:24px;padding-top:16px;font-size:12px;color:#999;line-height:1.6;">
+
+    <p style="margin:24px 0 4px;">
+      <a href="https://grantequity.org/login" style="display:inline-block;background:#15616d;color:#fff;font-size:15px;font-weight:600;text-decoration:none;padding:12px 22px;border-radius:8px;">
+        Sign in to your matches →
+      </a>
+    </p>
+
+    <p style="font-size:14px;line-height:1.65;color:#5a6775;margin-top:20px;">
+      Nothing else to do for now — keep an eye on your inbox Monday morning. Just reply to this
+      email if you have any questions.
+    </p>
+
+    <div style="border-top:1px solid #e6e9ed;margin-top:26px;padding-top:16px;font-size:12px;color:#626d79;line-height:1.6;">
       <p style="margin:0 0 8px;">You're receiving this because you signed up at grantequity.org.</p>
       ${
         unsubUrl
-          ? `<p style="margin:0 0 8px;">Didn't sign up or changed your mind? <a href="${unsubUrl}" style="color:#2d6a4f;">Unsubscribe here</a>.</p>`
+          ? `<p style="margin:0 0 8px;">Didn't sign up or changed your mind? <a href="${unsubUrl}" style="color:#15616d;">Unsubscribe here</a>.</p>`
           : ''
       }
-      ${address ? `<p style="margin:0;color:#bbb;">${address}</p>` : ''}
+      ${address ? `<p style="margin:0;color:#9aa4ae;">${address}</p>` : ''}
     </div>
   </div>`;
 }
@@ -85,7 +102,7 @@ Deno.serve(async (req) => {
     body: JSON.stringify({
       from: FROM,
       to: [org.email],
-      subject: "🌱 You're in — your first GrantEquity digest arrives Monday",
+      subject: "You're in — your first GrantEquity matches arrive Monday",
       html: confirmationHtml(org),
       headers,
       tags: org.id ? [{ name: 'org_id', value: String(org.id) }] : undefined,
