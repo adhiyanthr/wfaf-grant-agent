@@ -98,6 +98,14 @@ export function markApplied(token: string, grantId: string): Promise<void> {
   return call({ token, action: 'applied', grant_id: grantId }).then(() => {})
 }
 
+// Kicks off an on-demand grant search for this org. On failure the thrown
+// DashboardError carries the server's reason as `.code` (e.g. 'not_configured'
+// when the GitHub dispatch token isn't set), so the UI can explain what
+// happened — exactly like the authed triggerSearch() path.
+export function triggerTokenRefresh(token: string): Promise<void> {
+  return call({ token, action: 'refresh' }).then(() => {})
+}
+
 export interface SettingsOrg {
   name: string | null
   focus_areas: string[] | null

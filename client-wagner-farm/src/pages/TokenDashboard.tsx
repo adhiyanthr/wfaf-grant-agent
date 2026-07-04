@@ -3,11 +3,13 @@ import {
   fetchDashboard,
   submitTokenFeedback,
   markApplied,
+  triggerTokenRefresh,
   DashboardError,
   DashboardData,
   FeedbackResponse,
 } from '../lib/tokenDashboard'
 import { Match, displayScore, formatAmount, daysUntil } from '../lib/matches'
+import { nextMondayRun, formatDateTime } from '../lib/searchPreview'
 import { TokenNav } from '../components/TokenNav'
 
 // Set Referrer-Policy for this no-login view via a runtime meta tag as well as
@@ -29,12 +31,14 @@ type FeedbackState = Record<string, FeedbackResponse>
 type Pending = Record<string, boolean>
 
 function GrantCard({
+  token,
   match,
   current,
   pending,
   onFeedback,
   onApplied,
 }: {
+  token: string
   match: Match
   current: FeedbackResponse | undefined
   pending: boolean
@@ -101,7 +105,10 @@ function GrantCard({
       )}
 
       <div style={{ display: 'flex', gap: '10px', marginTop: '14px', flexWrap: 'wrap' }}>
-        <a href={g.url} target="_blank" rel="noopener noreferrer" className="btn">
+        <a href={`/dashboard/${token}/matches/${g.id}`} className="btn">
+          View details →
+        </a>
+        <a href={g.url} target="_blank" rel="noopener noreferrer" className="btn btn--ghost">
           Apply ↗
         </a>
       </div>
@@ -162,6 +169,33 @@ export function TokenDashboard({ token }: { token: string }) {
   const [notFound, setNotFound] = useState(false)
   const [feedback, setFeedback] = useState<FeedbackState>({})
   const [pending, setPending] = useState<Pending>({})
+  const [refreshing, setRefreshing] = useState(false)
+  const [refreshMsg, setRefreshMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
+
+  const handleRefresh = async () => {
+    if (!window.confirm('Run a fresh grant search now? New matches usually appear within a few minutes.')) {
+      return
+    }
+    setRefreshing(true)
+    setRefreshMsg(null)
+    try {
+      await triggerTokenRefresh(token)
+      setRefreshMsg({
+        kind: 'ok',
+        text: 'Search started. New matches usually arrive within a few minutes — reload this page shortly to see them.',
+      })
+    } catch (err) {
+      const code = err instanceof DashboardError ? err.code : 'failed'
+      setRefreshMsg({
+        kind: 'err',
+        text:
+          code === 'not_configured'
+            ? "On-demand refresh isn't switched on yet. Your matches still update automatically every Monday."
+            : 'Could not start a search just now. Please try again in a moment.',
+      })
+    }
+    setRefreshing(false)
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -254,6 +288,7 @@ export function TokenDashboard({ token }: { token: string }) {
   const renderCard = (m: Match) => (
     <GrantCard
       key={m.grant_id}
+      token={token}
       match={m}
       current={feedback[m.grant_id]}
       pending={!!pending[m.grant_id]}
@@ -267,10 +302,53 @@ export function TokenDashboard({ token }: { token: string }) {
       <TokenNav token={token} active="matches" />
       <div className="container">
         <h1 style={{ marginBottom: '8px' }}>Grant matches for {org.name || 'you'}</h1>
-        <p style={{ marginBottom: '24px', color: 'var(--ink-2)' }}>
+        <p style={{ marginBottom: '20px', color: 'var(--ink-2)' }}>
           {org.state ? `${org.state}` : ''}
           {org.county ? ` • ${org.county}` : ''}
         </p>
+
+        <div
+          style={{
+            display: 'flex',
+            gap: '28px',
+            flexWrap: 'wrap',
+            padding: '14px 18px',
+            borderRadius: '10px',
+            background: 'var(--bg)',
+            marginBottom: '32px',
+            fontSize: '0.9rem',
+          }}
+        >
+          <div>
+            <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: 'var(--ink-3)', letterSpacing: '0.03em' }}>
+              Matches
+            </div>
+            <div style={{ fontWeight: 600 }}>{matches.length}</div>
+          </div>
+          <div>
+            <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: 'var(--ink-3)', letterSpacing: '0.03em' }}>
+              Last updated
+            </div>
+            <div style={{ fontWeight: 600 }}>
+              {org.last_sent ? formatDateTime(new Date(org.last_sent)) : 'Not yet'}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: 'var(--ink-3)', letterSpacing: '0.03em' }}>
+              Next automatic search
+            </div>
+            <div style={{ fontWeight: 600 }}>{formatDateTime(nextMondayRun())}</div>
+          </div>
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center' }}>
+            <button className="btn btn--ghost" onClick={handleRefresh} disabled={refreshing}>
+              {refreshing ? 'Starting…' : 'Refresh matches now'}
+            </button>
+          </div>
+        </div>
+
+        {refreshMsg && (
+          <div className={`alert ${refreshMsg.kind === 'ok' ? 'success' : 'error'}`}>{refreshMsg.text}</div>
+        )}
 
         {matches.length === 0 && (
           <div className="card" style={{ textAlign: 'center' }}>

@@ -52,6 +52,12 @@ const MATCH_SELECT =
   'grant_id, fit_score, fit_rationale, eligibility_flags, analysis, first_seen, ' +
   'grants(id, title, funder, amount_min, amount_max, deadline, url, tags)';
 
+// For the token-gated "Refresh matches now" action, which fires the same
+// GitHub Actions grant-agent workflow that trigger-search uses (but gated by
+// the dashboard token rather than an authed session).
+const GH_REPO = 'adhiyanthr/wfaf-grant-agent';
+const WORKFLOW_FILE = 'grant-agent.yml';
+
 type FeedbackResponse = 'not_relevant' | 'more_like_this' | 'already_applied';
 const ALLOWED_RESPONSES: FeedbackResponse[] = [
   'not_relevant',
@@ -89,7 +95,7 @@ Deno.serve(async (req) => {
   const { data: org, error: orgErr } = await supabase
     .from('organizations')
     .select(
-      'id, name, focus_areas, county, state, last_sent, is_501c3, ' +
+      'id, email, name, focus_areas, county, state, last_sent, is_501c3, ' +
         'annual_budget, grant_size_pref, what_we_do, target_population'
     )
     .eq('dashboard_token', token)
@@ -101,6 +107,41 @@ Deno.serve(async (req) => {
   }
   // Unknown token: generic not_found, same as a malformed one.
   if (!org) return json({ error: 'not_found' }, 404);
+
+  // ---- Refresh: on-demand grant search -----------------------------------
+  // Token-gated equivalent of the trigger-search function. Fires the GitHub
+  // Actions grant-agent workflow for just this org so a fresh search runs
+  // without waiting for the Monday cron.
+  if (action === 'refresh') {
+    const ghToken = Deno.env.get('GH_DISPATCH_TOKEN');
+    // Degrade gracefully: the UI shows a "not switched on yet" message.
+    if (!ghToken) return json({ error: 'not_configured' }, 503);
+
+    const email = typeof org.email === 'string' ? org.email.toLowerCase() : '';
+    if (!email) return json({ error: 'not_configured' }, 503);
+
+    const res = await fetch(
+      `https://api.github.com/repos/${GH_REPO}/actions/workflows/${WORKFLOW_FILE}/dispatches`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${ghToken}`,
+          Accept: 'application/vnd.github+json',
+          'X-GitHub-Api-Version': '2022-11-28',
+          'User-Agent': 'wagner-farm-dashboard',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ ref: 'main', inputs: { org_email: email } }),
+      }
+    );
+
+    if (!res.ok) {
+      const body = await res.text();
+      console.error('dashboard-view refresh dispatch failed', redact(token), res.status, body);
+      return json({ error: 'failed' }, 502);
+    }
+    return json({ ok: true });
+  }
 
   // ---- Writes: feedback / applied ----------------------------------------
   if (action === 'feedback' || action === 'applied') {
