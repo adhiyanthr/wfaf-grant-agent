@@ -96,7 +96,8 @@ Deno.serve(async (req) => {
     .from('organizations')
     .select(
       'id, email, name, focus_areas, county, state, last_sent, is_501c3, ' +
-        'annual_budget, grant_size_pref, what_we_do, target_population'
+        'annual_budget, grant_size_pref, what_we_do, target_population, ' +
+        'active, frequency_days'
     )
     .eq('dashboard_token', token)
     .maybeSingle();
@@ -184,6 +185,8 @@ Deno.serve(async (req) => {
         grant_size_pref: org.grant_size_pref,
         what_we_do: org.what_we_do,
         target_population: org.target_population,
+        active: org.active,
+        frequency_days: org.frequency_days,
       },
     });
   }
@@ -203,13 +206,28 @@ Deno.serve(async (req) => {
       'grant_size_pref',
       'what_we_do',
       'target_population',
+      // Cadence + email on/off. `active` doubles as the subscribe/unsubscribe
+      // flag (same column the unsubscribe link sets).
+      'active',
+      'frequency_days',
     ];
+    const f = fields as Record<string, unknown>;
     const update: Record<string, unknown> = {};
     for (const key of allowedKeys) {
-      if (key in (fields as Record<string, unknown>)) {
-        update[key] = (fields as Record<string, unknown>)[key];
-      }
+      if (key in f) update[key] = f[key];
     }
+
+    // Validate the two typed/constrained fields so a bad client can't write
+    // garbage that would break the agent's cadence or subscription state.
+    if ('active' in update && typeof update.active !== 'boolean') {
+      return json({ error: 'bad_request' }, 400);
+    }
+    if ('frequency_days' in update) {
+      const n = Number(update.frequency_days);
+      if (![7, 14, 30].includes(n)) return json({ error: 'bad_request' }, 400);
+      update.frequency_days = n;
+    }
+
     if (Object.keys(update).length === 0) return json({ error: 'bad_request' }, 400);
 
     const { error: updErr } = await supabase

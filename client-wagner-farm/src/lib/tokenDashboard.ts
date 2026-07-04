@@ -116,6 +116,9 @@ export interface SettingsOrg {
   grant_size_pref: string | null
   what_we_do: string | null
   target_population: string | null
+  // Email on/off (subscribe/unsubscribe) and cadence in days (7/14/30).
+  active: boolean | null
+  frequency_days: number | null
 }
 
 export function fetchTokenSettings(token: string): Promise<{ org: SettingsOrg }> {

@@ -4,7 +4,6 @@ import { previewSearches } from '../lib/searchPreview'
 import { TokenNav } from '../components/TokenNav'
 
 type FormState = {
-  name: string
   focus_areas: string
   county: string
   state: string
@@ -13,11 +12,20 @@ type FormState = {
   grant_size_pref: string
   what_we_do: string
   target_population: string
+  active: boolean
+  frequency_days: number
 }
+
+// Cadence presets. The weekly cron can't send more often than weekly, so 7 is
+// the floor; larger values make the agent skip runs (see the agent loop).
+const FREQUENCY_OPTIONS = [
+  { value: 7, label: 'Weekly' },
+  { value: 14, label: 'Every 2 weeks' },
+  { value: 30, label: 'Monthly' },
+] as const
 
 function orgToForm(org: SettingsOrg): FormState {
   return {
-    name: org.name ?? '',
     focus_areas: (org.focus_areas ?? []).join(', '),
     county: org.county ?? '',
     state: org.state ?? '',
@@ -26,6 +34,8 @@ function orgToForm(org: SettingsOrg): FormState {
     grant_size_pref: org.grant_size_pref ?? '',
     what_we_do: org.what_we_do ?? '',
     target_population: org.target_population ?? '',
+    active: org.active ?? true,
+    frequency_days: org.frequency_days ?? 7,
   }
 }
 
@@ -64,7 +74,6 @@ export function TokenSettings({ token }: { token: string }) {
     setSaveError(null)
     try {
       await updateTokenSettings(token, {
-        name: form.name.trim() || null,
         focus_areas: form.focus_areas
           .split(',')
           .map((s) => s.trim())
@@ -76,6 +85,8 @@ export function TokenSettings({ token }: { token: string }) {
         grant_size_pref: form.grant_size_pref.trim() || null,
         what_we_do: form.what_we_do.trim() || null,
         target_population: form.target_population.trim() || null,
+        active: form.active,
+        frequency_days: form.frequency_days,
       })
       setSaved(true)
     } catch {
@@ -112,23 +123,12 @@ export function TokenSettings({ token }: { token: string }) {
       <div className="container">
       <h1 style={{ marginBottom: '8px' }}>Search settings</h1>
       <p style={{ marginBottom: '32px', color: 'var(--ink-2)' }}>
-        These fields shape what grants get searched for every Monday. Update them any time.
+        These settings shape what grants get searched for, and how often you hear about them. Update them any time.
       </p>
 
       <form onSubmit={handleSave}>
         <div className="card" style={{ marginBottom: '20px' }}>
           <h2 style={{ fontSize: '1.15rem', marginBottom: '20px' }}>About your organization</h2>
-
-          <div className="form-group">
-            <label htmlFor="name">Organization name</label>
-            <input
-              id="name"
-              type="text"
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-              style={{ width: '100%' }}
-            />
-          </div>
 
           <div className="form-group">
             <label htmlFor="focus_areas">Focus areas (comma-separated)</label>
@@ -169,7 +169,7 @@ export function TokenSettings({ token }: { token: string }) {
             <label htmlFor="what_we_do">What you do</label>
             <textarea
               id="what_we_do"
-              rows={3}
+              rows={6}
               value={form.what_we_do}
               onChange={(e) => setForm({ ...form, what_we_do: e.target.value })}
             />
@@ -179,7 +179,7 @@ export function TokenSettings({ token }: { token: string }) {
             <label htmlFor="target_population">Who you serve</label>
             <textarea
               id="target_population"
-              rows={2}
+              rows={5}
               value={form.target_population}
               onChange={(e) => setForm({ ...form, target_population: e.target.value })}
             />
@@ -226,6 +226,46 @@ export function TokenSettings({ token }: { token: string }) {
         </div>
 
         <div className="card" style={{ marginBottom: '20px' }}>
+          <h2 style={{ fontSize: '1.15rem', marginBottom: '20px' }}>Email &amp; frequency</h2>
+
+          <div className="form-group">
+            <label style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <input
+                type="checkbox"
+                checked={form.active}
+                onChange={(e) => setForm({ ...form, active: e.target.checked })}
+              />
+              Email me grant matches
+            </label>
+            <p className="muted" style={{ fontSize: '0.85rem', marginTop: '6px' }}>
+              {form.active
+                ? 'You are subscribed. Turn this off to stop all grant emails.'
+                : 'Emails are paused. Your matches still update here on the dashboard.'}
+            </p>
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="frequency_days">How often</label>
+            <select
+              id="frequency_days"
+              value={form.frequency_days}
+              onChange={(e) => setForm({ ...form, frequency_days: Number(e.target.value) })}
+              disabled={!form.active}
+              style={{ width: '100%' }}
+            >
+              {FREQUENCY_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+            <p className="muted" style={{ fontSize: '0.85rem', marginTop: '6px' }}>
+              How often grants are refreshed and emailed to you. Weekly is the most frequent.
+            </p>
+          </div>
+        </div>
+
+        <div className="card" style={{ marginBottom: '20px' }}>
           <h2 style={{ fontSize: '1.15rem', marginBottom: '6px' }}>What the agent will search for</h2>
           <p className="muted" style={{ marginBottom: '16px' }}>
             These are the exact web searches the agent runs based on the settings above. Edit the
@@ -248,7 +288,7 @@ export function TokenSettings({ token }: { token: string }) {
           </p>
         </div>
 
-        {saved && <div className="alert success" style={{ marginBottom: '16px' }}>Saved — next Monday's search will use these settings.</div>}
+        {saved && <div className="alert success" style={{ marginBottom: '16px' }}>Saved — your next search will use these settings.</div>}
         {saveError && <div className="alert error" style={{ marginBottom: '16px' }}>{saveError}</div>}
 
         <button type="submit" disabled={saving}>
