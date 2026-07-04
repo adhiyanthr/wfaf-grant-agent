@@ -97,3 +97,26 @@ export function submitTokenFeedback(
 export function markApplied(token: string, grantId: string): Promise<void> {
   return call({ token, action: 'applied', grant_id: grantId }).then(() => {})
 }
+
+export interface SettingsOrg {
+  name: string | null
+  focus_areas: string[] | null
+  county: string | null
+  state: string | null
+  is_501c3: boolean | null
+  annual_budget: string | null
+  grant_size_pref: string | null
+  what_we_do: string | null
+  target_population: string | null
+}
+
+export function fetchTokenSettings(token: string): Promise<{ org: SettingsOrg }> {
+  return call({ token, action: 'settings_get' })
+}
+
+export function updateTokenSettings(
+  token: string,
+  fields: Partial<SettingsOrg>
+): Promise<void> {
+  return call({ token, action: 'settings_update', fields }).then(() => {})
+}

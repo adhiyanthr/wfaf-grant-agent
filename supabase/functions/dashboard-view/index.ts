@@ -84,9 +84,14 @@ Deno.serve(async (req) => {
   );
 
   // Resolve token -> org. One indexed lookup; also gates every write below.
+  // Selects the full editable profile too, since settings_get/settings_update
+  // reuse this same row.
   const { data: org, error: orgErr } = await supabase
     .from('organizations')
-    .select('id, name, focus_areas, county, state, last_sent')
+    .select(
+      'id, name, focus_areas, county, state, last_sent, is_501c3, ' +
+        'annual_budget, grant_size_pref, what_we_do, target_population'
+    )
     .eq('dashboard_token', token)
     .maybeSingle();
 
@@ -120,6 +125,58 @@ Deno.serve(async (req) => {
     });
     if (insErr) {
       console.error('dashboard-view feedback insert failed', redact(token), insErr.message);
+      return json({ error: 'server_error' }, 500);
+    }
+    return json({ ok: true });
+  }
+
+  // ---- Settings: get / update ---------------------------------------------
+  if (action === 'settings_get') {
+    return json({
+      org: {
+        name: org.name,
+        focus_areas: org.focus_areas,
+        county: org.county,
+        state: org.state,
+        is_501c3: org.is_501c3,
+        annual_budget: org.annual_budget,
+        grant_size_pref: org.grant_size_pref,
+        what_we_do: org.what_we_do,
+        target_population: org.target_population,
+      },
+    });
+  }
+
+  if (action === 'settings_update') {
+    const fields = payload.fields;
+    if (typeof fields !== 'object' || fields === null || Array.isArray(fields)) {
+      return json({ error: 'bad_request' }, 400);
+    }
+    const allowedKeys = [
+      'name',
+      'focus_areas',
+      'county',
+      'state',
+      'is_501c3',
+      'annual_budget',
+      'grant_size_pref',
+      'what_we_do',
+      'target_population',
+    ];
+    const update: Record<string, unknown> = {};
+    for (const key of allowedKeys) {
+      if (key in (fields as Record<string, unknown>)) {
+        update[key] = (fields as Record<string, unknown>)[key];
+      }
+    }
+    if (Object.keys(update).length === 0) return json({ error: 'bad_request' }, 400);
+
+    const { error: updErr } = await supabase
+      .from('organizations')
+      .update(update)
+      .eq('id', org.id);
+    if (updErr) {
+      console.error('dashboard-view settings update failed', redact(token), updErr.message);
       return json({ error: 'server_error' }, 500);
     }
     return json({ ok: true });

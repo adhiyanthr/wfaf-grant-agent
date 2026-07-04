@@ -7,6 +7,7 @@ import { MatchDetail } from './pages/MatchDetail'
 import { Settings } from './pages/Settings'
 import { NotFound } from './pages/NotFound'
 import { TokenDashboard } from './pages/TokenDashboard'
+import { TokenSettings } from './pages/TokenSettings'
 
 // The bare root URL goes straight to the Wagner Farm token dashboard — no
 // login. This app has exactly one org, so there's nothing to route root to
@@ -33,9 +34,12 @@ function App() {
   // NOT render <Nav> (which calls supabase.auth and shows sign-in chrome) — the
   // token IS the credential. Branch out before anything auth-aware renders.
   if (page.startsWith('/dashboard/')) {
-    const token = page.split('/')[2]
-    if (token) return <TokenDashboard token={token} />
-    return <NotFound />
+    const parts = page.split('/') // ['', 'dashboard', token, subpage?]
+    const token = parts[2]
+    const subpage = parts[3]
+    if (!token) return <NotFound />
+    if (subpage === 'settings') return <TokenSettings token={token} />
+    return <TokenDashboard token={token} />
   }
 
   const renderPage = () => {

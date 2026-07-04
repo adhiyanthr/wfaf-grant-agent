@@ -8,6 +8,7 @@ import {
   FeedbackResponse,
 } from '../lib/tokenDashboard'
 import { Match, displayScore, formatAmount, daysUntil } from '../lib/matches'
+import { TokenNav } from '../components/TokenNav'
 
 // Set Referrer-Policy for this no-login view via a runtime meta tag as well as
 // the response header (vercel.json). Two layers because the token lives in the
@@ -262,39 +263,42 @@ export function TokenDashboard({ token }: { token: string }) {
   )
 
   return (
-    <div className="container">
-      <h1 style={{ marginBottom: '8px' }}>Grant matches for {org.name || 'you'}</h1>
-      <p style={{ marginBottom: '24px', color: 'var(--ink-2)' }}>
-        {org.state ? `${org.state}` : ''}
-        {org.county ? ` • ${org.county}` : ''}
-      </p>
+    <>
+      <TokenNav token={token} active="matches" />
+      <div className="container">
+        <h1 style={{ marginBottom: '8px' }}>Grant matches for {org.name || 'you'}</h1>
+        <p style={{ marginBottom: '24px', color: 'var(--ink-2)' }}>
+          {org.state ? `${org.state}` : ''}
+          {org.county ? ` • ${org.county}` : ''}
+        </p>
 
-      {matches.length === 0 && (
-        <div className="card" style={{ textAlign: 'center' }}>
-          <h2 style={{ marginBottom: '10px' }}>Your first matches arrive Monday</h2>
-          <p className="muted">
-            Grants are searched every Monday morning and your matches will show up here.
-          </p>
+        {matches.length === 0 && (
+          <div className="card" style={{ textAlign: 'center' }}>
+            <h2 style={{ marginBottom: '10px' }}>Your first matches arrive Monday</h2>
+            <p className="muted">
+              Grants are searched every Monday morning and your matches will show up here.
+            </p>
+          </div>
+        )}
+
+        {closingSoon.length > 0 && (
+          <div style={{ marginBottom: '40px' }}>
+            <h2 style={{ marginBottom: '20px', fontSize: '1.5rem' }}>🔥 Closing soon (next 30 days)</h2>
+            {closingSoon.map(renderCard)}
+          </div>
+        )}
+
+        {rest.length > 0 && (
+          <div style={{ marginBottom: '40px' }}>
+            <h2 style={{ marginBottom: '20px', fontSize: '1.5rem' }}>All matches</h2>
+            {rest.map(renderCard)}
+          </div>
+        )}
+
+        <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--ink-2)' }}>
+          <p>New grants are added every Monday morning.</p>
         </div>
-      )}
-
-      {closingSoon.length > 0 && (
-        <div style={{ marginBottom: '40px' }}>
-          <h2 style={{ marginBottom: '20px', fontSize: '1.5rem' }}>🔥 Closing soon (next 30 days)</h2>
-          {closingSoon.map(renderCard)}
-        </div>
-      )}
-
-      {rest.length > 0 && (
-        <div style={{ marginBottom: '40px' }}>
-          <h2 style={{ marginBottom: '20px', fontSize: '1.5rem' }}>All matches</h2>
-          {rest.map(renderCard)}
-        </div>
-      )}
-
-      <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--ink-2)' }}>
-        <p>New grants are added every Monday morning.</p>
       </div>
-    </div>
+    </>
   )
 }
