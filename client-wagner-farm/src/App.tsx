@@ -8,16 +8,21 @@ import { Settings } from './pages/Settings'
 import { NotFound } from './pages/NotFound'
 import { TokenDashboard } from './pages/TokenDashboard'
 
+// The bare root URL goes straight to the Wagner Farm token dashboard — no
+// login. This app has exactly one org, so there's nothing to route root to
+// besides its own dashboard.
+const ROOT_DASHBOARD_TOKEN = 'a0c4a540-6c04-4b96-9571-2ac8c444a69d'
+
 function App() {
   const [page, setPage] = useState('')
 
   useEffect(() => {
     const path = window.location.pathname
-    setPage(path === '/' ? '/matches' : path)
+    setPage(path === '/' ? `/dashboard/${ROOT_DASHBOARD_TOKEN}` : path)
 
     const handlePopState = () => {
       const newPath = window.location.pathname
-      setPage(newPath === '/' ? '/matches' : newPath)
+      setPage(newPath === '/' ? `/dashboard/${ROOT_DASHBOARD_TOKEN}` : newPath)
     }
 
     window.addEventListener('popstate', handlePopState)
