@@ -109,6 +109,68 @@ export async function filterNewGrantsForOrg(orgId, grants) {
   });
 }
 
+// A handful of real grants this org already has, shaped as scoring candidates
+// (title/funder/url + a snippet from the stored rationale). Used by
+// score-preview.js to exercise the fit pipeline over real pairs without paying
+// for a fresh web-search pass.
+export async function getSampleGrants(orgId, limit = 8) {
+  const { data, error } = await getClient()
+    .from('org_grants')
+    .select('fit_rationale, grants!inner(title, funder, url, deadline, amount_min, amount_max)')
+    .eq('org_id', orgId)
+    .limit(limit);
+
+  if (error) throw new Error(`Supabase read error (sample grants): ${error.message}`);
+  return (data || [])
+    .filter((r) => r.grants?.url)
+    .map((r) => ({
+      title: r.grants.title,
+      funder: r.grants.funder,
+      url: r.grants.url,
+      deadline: r.grants.deadline,
+      amount_min: r.grants.amount_min,
+      amount_max: r.grants.amount_max,
+      // Snippet used as the partial-path fallback input.
+      snippet: r.fit_rationale ?? null,
+    }));
+}
+
+// Per-(org, grant) scoring cache. Returns a Map url -> stored fit metadata for
+// grants this org already has, so scoreGrantsForOrg can skip re-scoring a grant
+// whose stored grants.eligibility_hash still equals the match's scored_hash.
+export async function getExistingMatchMeta(orgId, urls) {
+  const wanted = [...new Set((urls || []).filter(Boolean))];
+  if (!wanted.length) return new Map();
+
+  const { data, error } = await getClient()
+    .from('org_grants')
+    .select(
+      'scored_hash, fit_score, fit_reasoning, eligibility_flags, effort_estimate, ' +
+      'data_confidence, eligibility_text_unavailable, ' +
+      'grants!inner(url, eligibility_hash)'
+    )
+    .eq('org_id', orgId);
+
+  if (error) throw new Error(`Supabase read error (match meta): ${error.message}`);
+
+  const byUrl = new Map();
+  for (const r of data || []) {
+    const url = r.grants?.url;
+    if (!url || !wanted.includes(url)) continue;
+    byUrl.set(url, {
+      eligibility_hash: r.grants?.eligibility_hash ?? null,
+      scored_hash: r.scored_hash ?? null,
+      fit_score: r.fit_score ?? null,
+      fit_reasoning: r.fit_reasoning ?? null,
+      eligibility_flags: r.eligibility_flags ?? [],
+      effort_estimate: r.effort_estimate ?? null,
+      data_confidence: r.data_confidence ?? 'full',
+      eligibility_text_unavailable: r.eligibility_text_unavailable ?? false,
+    });
+  }
+  return byUrl;
+}
+
 // Upserts grants into the shared `grants` catalog (by url), then links them to
 // the org in `org_grants`. Mutates each grant with its catalog `id` and returns
 // the same array so callers can email + mark them.
@@ -138,6 +200,10 @@ export async function saveOrgGrants(orgId, grants) {
     fit_score: g.fit_score,
     fit_rationale: g.fit_rationale ?? null,
     tags: g.tags ?? [],
+    // Full eligibility text + its hash power the fit cache. Present only when the
+    // page fetch succeeded; the snippet (partial) path leaves them null.
+    full_eligibility_text: g.full_eligibility_text ?? null,
+    eligibility_hash: g.eligibility_hash ?? null,
   }));
 
   const { data: saved, error } = await getClient()
@@ -160,13 +226,39 @@ export async function saveOrgGrants(orgId, grants) {
       grant_id: g.id,
       fit_score: g.fit_score,
       fit_rationale: g.fit_rationale ?? null,
+      // Platform v1 fit outputs.
+      fit_reasoning: g.fit_reasoning ?? null,
+      eligibility_flags: g.eligibility_flags ?? [],
+      effort_estimate: g.effort_estimate ?? null,
+      scored_hash: g.scored_hash ?? null,
+      data_confidence: g.data_confidence ?? 'full',
+      eligibility_text_unavailable: g.eligibility_text_unavailable ?? false,
     }));
 
+  // ignoreDuplicates: on conflict (org already has this grant) do NOTHING, so a
+  // user's status/first_seen and prior scoring are preserved. New-to-org grants
+  // (the post-dedup common case) insert with all fit fields; status defaults to
+  // 'new' via the column default.
   if (orgRows.length) {
     const { error: linkErr } = await getClient()
       .from('org_grants')
       .upsert(orgRows, { onConflict: 'org_id,grant_id', ignoreDuplicates: true });
     if (linkErr) throw new Error(`Supabase insert error (org_grants): ${linkErr.message}`);
+  }
+
+  // Attach the org_grants surrogate id (g.match_id) so the email can deep-link to
+  // /matches/:id. ignoreDuplicates upsert doesn't return conflict rows, so read
+  // the ids back for this org's grants explicitly.
+  const grantIds = grants.map((g) => g.id).filter(Boolean);
+  if (grantIds.length) {
+    const { data: links, error: readErr } = await getClient()
+      .from('org_grants')
+      .select('id, grant_id')
+      .eq('org_id', orgId)
+      .in('grant_id', grantIds);
+    if (readErr) throw new Error(`Supabase read error (org_grants ids): ${readErr.message}`);
+    const matchIdByGrant = new Map((links || []).map((r) => [r.grant_id, r.id]));
+    for (const g of grants) g.match_id = matchIdByGrant.get(g.id) ?? null;
   }
 
   return grants;
