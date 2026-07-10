@@ -1,17 +1,23 @@
 {
-  "name": "grant-equity-app",
+  "name": "wfaf-grant-agent",
+  "version": "1.0.0",
+  "description": "Automated grant discovery agent for Wagner Farm Arboretum Foundation",
   "private": true,
-  "version": "0.0.1",
   "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
+    "start": "node src/index.js",
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.105.0",
+    "@supabase/supabase-js": "^2.47.0",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "@supabase/supabase-js": "^2.38.0"
+    "react-dom": "^18.2.0"
   },
   "devDependencies": {
     "@types/react": "^18.2.0",

@@ -67,6 +67,26 @@ function unsubscribeUrl(org) {
   return `${base.replace(/\/$/, '')}/unsubscribe?token=${org.unsubscribe_token}`;
 }
 
+// Deep link into the SPA for a match (org_grants.id). Returns null when
+// APP_BASE_URL is unset or the grant has no match_id, so the card falls back to
+// the external grant link only.
+function matchUrl(g) {
+  const base = process.env.APP_BASE_URL;
+  if (!base || !g.match_id) return null;
+  return `${base.replace(/\/$/, '')}/matches/${g.match_id}`;
+}
+
+// Small "Limited data" badge — mirrors the SPA ConfidenceBadge so a partial-
+// confidence match looks the same in email and app (no silent quality drop).
+function confidenceBadgeHtml(g) {
+  if (g.data_confidence !== 'partial') return '';
+  return `<span style="
+    display:inline-block; background:#fff4e5; color:#92500a;
+    border:1px solid #f0b26b; border-radius:999px; padding:1px 8px;
+    font-size:11px; font-weight:700; margin-left:6px; white-space:nowrap;
+  ">⚠ Limited data</span>`;
+}
+
 function buildGrantCard(g, urgent) {
   const amount = formatAmount(g.amount_min, g.amount_max);
   const tags = (g.tags || []).map((t) => `#${t}`).join(' ');
@@ -91,7 +111,7 @@ function buildGrantCard(g, urgent) {
     ">
       <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;">
         <h3 style="margin: 0 0 4px; font-size: 15px; color: #1a1a1a; line-height: 1.4;">
-          ${g.title}
+          ${g.title}${confidenceBadgeHtml(g)}
         </h3>
         <span style="
           background: ${scoreColor(g.fit_score)};
@@ -115,24 +135,31 @@ function buildGrantCard(g, urgent) {
       </div>
 
       <p style="margin: 8px 0 6px; font-size: 14px; color: #444; font-style: italic;">
-        ${g.fit_rationale || ''}
+        ${g.fit_reasoning || g.fit_rationale || ''}
       </p>
 
       ${g.eligibility_flags?.length ? `<p style="margin: 4px 0 8px; font-size: 12px; color: #92500a;">⚠️ ${g.eligibility_flags.join(' · ')}</p>` : ''}
 
       ${tags ? `<p style="margin: 4px 0 8px; font-size: 12px; color: #888;">${tags}</p>` : ''}
 
-      <a href="${g.url}" style="
-        display: inline-block;
-        color: #2d6a4f;
-        font-size: 14px;
-        font-weight: 500;
-        text-decoration: none;
-        border: 1px solid #2d6a4f;
-        padding: 4px 12px;
-        border-radius: 4px;
-        margin-top: 4px;
-      ">View Grant →</a>
+      ${(() => {
+        const appUrl = matchUrl(g);
+        // Primary CTA is the in-app match page (where the org can act on the
+        // match); the external funder page is kept as a secondary link.
+        const primary = appUrl
+          ? `<a href="${appUrl}" style="
+              display: inline-block; background:#2d6a4f; color:#fff;
+              font-size: 14px; font-weight: 600; text-decoration: none;
+              padding: 6px 14px; border-radius: 4px; margin-top: 4px;
+            ">Review match →</a>`
+          : '';
+        const secondary = `<a href="${g.url}" style="
+            display: inline-block; color: #2d6a4f; font-size: 14px; font-weight: 500;
+            text-decoration: none; border: 1px solid #2d6a4f; padding: 4px 12px;
+            border-radius: 4px; margin-top: 4px; ${appUrl ? 'margin-left:8px;' : ''}
+          ">${appUrl ? 'View grant page ↗' : 'View Grant →'}</a>`;
+        return `<div>${primary}${secondary}</div>`;
+      })()}
     </div>
   `;
 }
@@ -227,14 +254,17 @@ export async function sendDigest(org, grants) {
   if (!grants.length) return null;
   if (!org.email) throw new Error(`Org ${org.id || org.name} has no email`);
 
-  const weekOf = new Date().toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
-
-  const subject = `🌱 ${grants.length} New Grant${grants.length !== 1 ? 's' : ''} for ${org.name} – ${weekOf}`;
+  const n = grants.length;
+  const subject = `🌱 ${n} new high-fit match${n !== 1 ? 'es' : ''} this week – ${org.name}`;
   const html = buildEmail(org, grants);
+
+  // Extra recipients managed by the org in the Profile editor
+  // (organizations.digest_recipients). De-dup and drop the primary email so it
+  // isn't listed twice.
+  const extras = Array.isArray(org.digest_recipients) ? org.digest_recipients : [];
+  const recipients = [
+    ...new Set([org.email, ...extras.filter((e) => e && e !== org.email)]),
+  ];
 
   // One-click unsubscribe (RFC 8058) so Gmail/Outlook render a native
   // unsubscribe control and List-Unsubscribe-Post enables one-click POST.
@@ -247,7 +277,7 @@ export async function sendDigest(org, grants) {
 
   const payload = {
     from: FROM,
-    to: [org.email],
+    to: recipients,
     subject,
     html,
     headers,
@@ -271,6 +301,6 @@ export async function sendDigest(org, grants) {
   }
 
   const result = await res.json();
-  console.log(`  Email sent to ${org.email}. Resend ID: ${result.id}`);
+  console.log(`  Email sent to ${recipients.join(', ')}. Resend ID: ${result.id}`);
   return result.id;
 }

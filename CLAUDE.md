@@ -5,6 +5,13 @@ subscribed org, dedups via Supabase, emails digests via Resend. Three Deno edge
 functions in `supabase/functions/`. Full overview: `README.md`.
 
 ## Key facts
+- **Platform v1 (in progress):** `app/` is a Vite + React SPA (Supabase Auth
+  magic-link, RLS-scoped per org) — profile editor + matches dashboard. The
+  agent now runs a per-(org, grant) fit-scoring pass (`src/agent.js`
+  `scoreGrantsForOrg` + `src/fetchPage.js`) against full eligibility text, with a
+  snippet fallback that marks the match `data_confidence = partial`. Schema lives
+  in `migrations/platform_v1.sql` (run manually). Validate scoring with
+  `node --env-file=.env src/score-preview.js` before trusting cron output.
 - **Supabase project ref:** `ujixxuvfpuykcmzcebmg` (functions base URL:
   `https://ujixxuvfpuykcmzcebmg.supabase.co/functions/v1`).
 - **Default branch:** `main`. The GitHub Actions Monday cron (`schedule`) always
@@ -43,7 +50,8 @@ TARGET_ORG_EMAIL=x@y.com node src/index.js # single org
 ## CI config (authoritative split is in .github/workflows/grant-agent.yml)
 - GitHub **Secrets:** `ANTHROPIC_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`,
   `RESEND_API_KEY`.
-- GitHub **Variables:** `MAIL_FROM`, `UNSUBSCRIBE_BASE_URL`, `MAILING_ADDRESS`.
+- GitHub **Variables:** `MAIL_FROM`, `UNSUBSCRIBE_BASE_URL`, `MAILING_ADDRESS`,
+  `APP_BASE_URL` (platform SPA base URL for email deep-links to `/matches/:id`).
 - Function secrets (set via `supabase secrets set`): `CONFIRM_WEBHOOK_SECRET`,
   `RESEND_WEBHOOK_SECRET`, `FEEDBACK_WEBHOOK_SECRET`, `MAIL_FROM`, `RESEND_API_KEY`,
   `UNSUBSCRIBE_BASE_URL`.

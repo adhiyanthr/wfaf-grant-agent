@@ -1,9 +1,10 @@
-import { searchGrantsForOrg } from './agent.js';
+import { searchGrantsForOrg, scoreGrantsForOrg } from './agent.js';
 import {
   getActiveOrgs,
   getOrgByEmail,
   getRecentFeedbackForOrg,
   filterNewGrantsForOrg,
+  getExistingMatchMeta,
   saveOrgGrants,
   markOrgDigestSent,
 } from './db.js';
@@ -27,9 +28,22 @@ async function runForOrg(org) {
     return { sent: 0 };
   }
 
+  // Fit-scoring pass (the moat): score each new grant against its full
+  // eligibility text (snippet fallback + partial flag on fetch failure),
+  // producing fit_reasoning / eligibility_flags / effort_estimate / confidence.
+  // Grants failing the generic-output or hedge guards are dropped here.
+  const cache = await getExistingMatchMeta(org.id, newGrants.map((g) => g.url));
+  const scoredGrants = await scoreGrantsForOrg(org, newGrants, cache);
+  console.log(`  ${scoredGrants.length} grants passed fit scoring`);
+
+  if (!scoredGrants.length) {
+    console.log('  No grants survived scoring — no email sent.');
+    return { sent: 0 };
+  }
+
   // saveOrgGrants dedupes by url and stamps each grant with its catalog id;
   // use its returned array so the digest/marking match what was persisted.
-  const savedGrants = await saveOrgGrants(org.id, newGrants);
+  const savedGrants = await saveOrgGrants(org.id, scoredGrants);
   await sendDigest(org, savedGrants);
   await markOrgDigestSent(org.id, savedGrants.map((g) => g.id).filter(Boolean));
 
