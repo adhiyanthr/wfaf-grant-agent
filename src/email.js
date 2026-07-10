@@ -46,6 +46,19 @@ function scoreColor(score) {
   return '#52796f';
 }
 
+// The Wagner Farm white-label dashboard link. Deliberately WFAF-only: this is a
+// client-specific, unbranded dashboard, so we only inject it for that org (by
+// email) and only when its base URL + token are configured. Every other org's
+// digest is unchanged. The token is static (organizations.dashboard_token) and
+// the link is a no-login, token-gated view. Returns null to degrade gracefully.
+const WFAF_DASHBOARD_EMAIL = 'adhiyanth.r@gmail.com';
+function dashboardUrl(org) {
+  const base = process.env.DASHBOARD_BASE_URL;
+  if (!base || !org.dashboard_token) return null;
+  if ((org.email || '').toLowerCase() !== WFAF_DASHBOARD_EMAIL) return null;
+  return `${base.replace(/\/$/, '')}/dashboard/${org.dashboard_token}`;
+}
+
 // The per-org unsubscribe URL (one-click + footer link). Returns null when the
 // base URL or token is missing so we degrade gracefully in local testing.
 function unsubscribeUrl(org) {
@@ -125,6 +138,8 @@ function buildGrantCard(g, urgent) {
         ${g.fit_reasoning || g.fit_rationale || ''}
       </p>
 
+      ${g.eligibility_flags?.length ? `<p style="margin: 4px 0 8px; font-size: 12px; color: #92500a;">⚠️ ${g.eligibility_flags.join(' · ')}</p>` : ''}
+
       ${tags ? `<p style="margin: 4px 0 8px; font-size: 12px; color: #888;">${tags}</p>` : ''}
 
       ${(() => {
@@ -165,14 +180,21 @@ function sectionHeader(text) {
 // standard "verify at source" disclaimer.
 function buildFooter(org) {
   const unsubUrl = unsubscribeUrl(org);
+  const dashUrl = dashboardUrl(org);
   const address = process.env.MAILING_ADDRESS || '';
 
   return `
     <div style="border-top: 1px solid #e0e0e0; margin-top: 24px; padding-top: 16px; font-size: 12px; color: #999; line-height: 1.6;">
-      <p style="margin: 0 0 8px;">
+      ${
+        dashUrl
+          ? `<p style="margin: 0 0 8px;">
+        <a href="${dashUrl}" style="color:#2d6a4f; font-weight:600;">View all your matches & give feedback →</a>
+      </p>`
+          : `<p style="margin: 0 0 8px;">
         This grant digest is sent by GrantEquity, a free service for New Jersey nonprofits.
         Verify all amounts and deadlines at the source link before applying.
-      </p>
+      </p>`
+      }
       ${
         unsubUrl
           ? `<p style="margin: 0 0 8px;">Don't want these emails? <a href="${unsubUrl}" style="color:#2d6a4f;">Unsubscribe here</a>.</p>`

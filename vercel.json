@@ -1,0 +1,12 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "npm install && npm run build && rm -rf dist && mkdir dist && cp index.html dist/ && cp -R _app dist/_app",
+  "outputDirectory": "dist",
+  "rewrites": [
+    { "source": "/login",         "destination": "/_app/index.html" },
+    { "source": "/profile",       "destination": "/_app/index.html" },
+    { "source": "/matches",       "destination": "/_app/index.html" },
+    { "source": "/matches/(.*)",  "destination": "/_app/index.html" }
+  ]
+}
+

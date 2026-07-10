@@ -2,6 +2,7 @@ import { searchGrantsForOrg, scoreGrantsForOrg } from './agent.js';
 import {
   getActiveOrgs,
   getOrgByEmail,
+  getRecentFeedbackForOrg,
   filterNewGrantsForOrg,
   getExistingMatchMeta,
   saveOrgGrants,
@@ -13,10 +14,13 @@ import { sendDigest } from './email.js';
 async function runForOrg(org) {
   console.log(`\n[${org.email}] ${org.name} — starting`);
 
-  const grants = await searchGrantsForOrg(org);
+  const feedback = await getRecentFeedbackForOrg(org.id);
+  if (feedback.length) console.log(`  ${feedback.length} feedback item(s) injected into prompt`);
+
+  const grants = await searchGrantsForOrg(org, feedback);
   console.log(`  ${grants.length} qualifying grants from search`);
 
-  const newGrants = await filterNewGrantsForOrg(org.id, grants);
+  const newGrants = await filterNewGrantsForOrg(org.id, grants, feedback);
   console.log(`  ${newGrants.length} are new for this org`);
 
   if (!newGrants.length) {
@@ -62,10 +66,25 @@ async function run() {
     }
     orgs = [org];
   } else {
-    // Weekly cron path: every active org.
+    // Weekly cron path: every active org, but honor each org's cadence.
     console.log(`[${new Date().toISOString()}] GrantEquity grant agent starting (all active orgs)...`);
-    orgs = await getActiveOrgs();
-    console.log(`${orgs.length} active org(s) to process`);
+    const active = await getActiveOrgs();
+    // Per-org frequency: skip an org whose last digest is newer than its
+    // frequency_days window. The cron fires weekly, so frequency_days > 7 makes
+    // an org receive grants/emails less often (never more). Never-sent orgs and
+    // orgs missing/invalid frequency_days always run. See migrations/frequency_days.sql.
+    const DAY_MS = 24 * 60 * 60 * 1000;
+    orgs = active.filter((org) => {
+      const days = Number(org.frequency_days);
+      if (!org.last_sent || !Number.isFinite(days) || days <= 7) return true;
+      const dueAt = new Date(org.last_sent).getTime() + days * DAY_MS;
+      const due = Date.now() >= dueAt;
+      if (!due) {
+        console.log(`  [${org.email}] skipped — next due ${new Date(dueAt).toISOString().slice(0, 10)} (every ${days}d)`);
+      }
+      return due;
+    });
+    console.log(`${orgs.length} of ${active.length} active org(s) due to process`);
   }
 
   let totalSent = 0;
