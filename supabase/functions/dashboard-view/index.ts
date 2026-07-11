@@ -48,6 +48,59 @@ function redact(token: unknown): string {
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+// Matches are only shown while they can realistically be applied to: deadline
+// today..+90 days. Expired and far-future grants are hidden from the dashboard
+// (not deleted — feedback/applied history must survive, and a far-out grant
+// reappears once its deadline enters the window). No-deadline (rolling) grants
+// stay visible. The agent enforces the same window at sourcing time.
+const APPLY_WINDOW_DAYS = 90;
+const DAY_MS = 24 * 60 * 60 * 1000;
+function inApplyWindow(deadline: unknown): boolean {
+  if (typeof deadline !== 'string' || !deadline) return true;
+  const d = new Date(deadline + 'T00:00:00');
+  if (isNaN(d.getTime())) return true;
+  const days = Math.ceil((d.getTime() - Date.now()) / DAY_MS);
+  return days >= 0 && days <= APPLY_WINDOW_DAYS;
+}
+
+// --- Site/admin password support -------------------------------------------
+// Both passwords live in app_settings as SHA-256 hex hashes (see
+// migrations/wf_site_admin_password.sql). The site password is a soft browser
+// gate; the admin password gates the dashboard Admin area and is verified
+// HERE (server-side, service role) on every admin action — the client is
+// never trusted with the comparison.
+const SITE_PW_KEY = 'site_password_hash';
+const ADMIN_PW_KEY = 'admin_password_hash';
+
+async function sha256Hex(s: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+// deno-lint-ignore no-explicit-any
+async function getSetting(supabase: any, key: string): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('app_settings')
+    .select('value')
+    .eq('key', key)
+    .maybeSingle();
+  if (error) throw new Error(`app_settings read failed: ${error.message}`);
+  return data?.value ?? null;
+}
+
+// deno-lint-ignore no-explicit-any
+async function setSetting(supabase: any, key: string, value: string): Promise<void> {
+  const { error } = await supabase
+    .from('app_settings')
+    .upsert({ key, value, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+  if (error) throw new Error(`app_settings write failed: ${error.message}`);
+}
+
+// New passwords must be real passwords, not empty strings or novels.
+function validNewPassword(p: unknown): p is string {
+  return typeof p === 'string' && p.length >= 8 && p.length <= 200;
+}
+
 const MATCH_SELECT =
   'grant_id, fit_score, fit_rationale, eligibility_flags, analysis, first_seen, ' +
   'grants(id, title, funder, amount_min, amount_max, deadline, url, tags)';
@@ -142,6 +195,102 @@ Deno.serve(async (req) => {
       return json({ error: 'failed' }, 502);
     }
     return json({ ok: true });
+  }
+
+  // ---- Passwords: site gate change + admin verification --------------------
+  if (action === 'site_password_change') {
+    try {
+      const next = payload.new_password;
+      if (!validNewPassword(next)) return json({ error: 'weak_password' }, 400);
+
+      const adminPw = typeof payload.admin_password === 'string' ? payload.admin_password : '';
+      const current = typeof payload.current_password === 'string' ? payload.current_password : '';
+      const [siteHash, adminHash] = await Promise.all([
+        getSetting(supabase, SITE_PW_KEY),
+        getSetting(supabase, ADMIN_PW_KEY),
+      ]);
+
+      // Two ways in: the admin password (Admin page), or the current site
+      // password (Settings page). A fresh install with no site hash yet is
+      // fail-open, mirroring the browser gate.
+      let authorized = false;
+      if (adminPw && adminHash) {
+        authorized = (await sha256Hex(adminPw)) === adminHash;
+      } else if (!siteHash) {
+        authorized = true;
+      } else {
+        authorized = current !== '' && (await sha256Hex(current)) === siteHash;
+      }
+      if (!authorized) return json({ error: 'wrong_password' }, 403);
+
+      await setSetting(supabase, SITE_PW_KEY, await sha256Hex(next));
+      return json({ ok: true });
+    } catch (err) {
+      console.error('dashboard-view site_password_change failed', redact(token), (err as Error).message);
+      return json({ error: 'server_error' }, 500);
+    }
+  }
+
+  if (action === 'admin_verify' || action === 'admin_change_password') {
+    try {
+      const adminPw = typeof payload.admin_password === 'string' ? payload.admin_password : '';
+      const adminHash = await getSetting(supabase, ADMIN_PW_KEY);
+      // No admin password configured -> admin area is off, never fail-open.
+      if (!adminHash) return json({ error: 'not_configured' }, 503);
+      if (!adminPw || (await sha256Hex(adminPw)) !== adminHash) {
+        return json({ error: 'wrong_password' }, 403);
+      }
+      if (action === 'admin_verify') return json({ ok: true });
+
+      const next = payload.new_password;
+      if (!validNewPassword(next)) return json({ error: 'weak_password' }, 400);
+      await setSetting(supabase, ADMIN_PW_KEY, await sha256Hex(next));
+      return json({ ok: true });
+    } catch (err) {
+      console.error('dashboard-view admin action failed', redact(token), (err as Error).message);
+      return json({ error: 'server_error' }, 500);
+    }
+  }
+
+  // ---- Read: applied grants -------------------------------------------------
+  // Grants whose LATEST feedback is already_applied, with when it was marked.
+  // Deliberately NOT deadline-filtered: an application already made must stay
+  // visible after the grant leaves the matches window.
+  if (action === 'applied_list') {
+    const { data: fb, error: fbErr } = await supabase
+      .from('match_feedback')
+      .select('grant_id, response, created_at')
+      .eq('org_id', org.id)
+      .in('response', ALLOWED_RESPONSES)
+      .not('grant_id', 'is', null)
+      .order('created_at', { ascending: false });
+    if (fbErr) {
+      console.error('dashboard-view applied_list feedback fetch failed', redact(token), fbErr.message);
+      return json({ error: 'server_error' }, 500);
+    }
+
+    const latest = new Map<string, { response: string; created_at: string }>();
+    for (const row of fb ?? []) {
+      if (!latest.has(row.grant_id)) latest.set(row.grant_id, row);
+    }
+    const appliedAt: Record<string, string> = {};
+    for (const [grantId, row] of latest) {
+      if (row.response === 'already_applied') appliedAt[grantId] = row.created_at;
+    }
+
+    const ids = Object.keys(appliedAt);
+    if (!ids.length) return json({ matches: [], applied_at: {} });
+
+    const { data: matches, error: matchErr } = await supabase
+      .from('org_grants')
+      .select(MATCH_SELECT)
+      .eq('org_id', org.id)
+      .in('grant_id', ids);
+    if (matchErr) {
+      console.error('dashboard-view applied_list matches fetch failed', redact(token), matchErr.message);
+      return json({ error: 'server_error' }, 500);
+    }
+    return json({ matches: matches ?? [], applied_at: appliedAt });
   }
 
   // ---- Writes: feedback / applied ----------------------------------------
@@ -269,6 +418,13 @@ Deno.serve(async (req) => {
     return json({ error: 'server_error' }, 500);
   }
 
+  // Hide expired / far-future grants (see inApplyWindow). The join is a
+  // to-one, but supabase-js types it loosely — handle both shapes.
+  const visible = (matches ?? []).filter((m) => {
+    const g = Array.isArray(m.grants) ? m.grants[0] : m.grants;
+    return inApplyWindow(g?.deadline);
+  });
+
   return json({
     org: {
       name: org.name,
@@ -277,7 +433,7 @@ Deno.serve(async (req) => {
       state: org.state,
       last_sent: org.last_sent,
     },
-    matches: matches ?? [],
+    matches: visible,
     feedback: feedback ?? [],
   });
 });

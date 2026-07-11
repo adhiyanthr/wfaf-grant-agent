@@ -133,16 +133,14 @@ function GrantCard({
           disabled={pending}
           aria-pressed={current === 'more_like_this'}
           onClick={() => onFeedback(g.id, 'more_like_this')}
-          style={current === 'more_like_this' ? { borderColor: 'var(--accent)', color: 'var(--accent)' } : undefined}
         >
           👍 Relevant
         </button>
         <button
-          className="btn btn--ghost"
+          className="btn btn--ghost btn--danger"
           disabled={pending}
           aria-pressed={current === 'not_relevant'}
           onClick={() => onFeedback(g.id, 'not_relevant')}
-          style={current === 'not_relevant' ? { borderColor: '#c0392b', color: '#c0392b' } : undefined}
         >
           👎 Not relevant
         </button>
@@ -151,7 +149,6 @@ function GrantCard({
           disabled={pending}
           aria-pressed={current === 'already_applied'}
           onClick={() => onApplied(g.id)}
-          style={current === 'already_applied' ? { borderColor: 'var(--accent)', color: 'var(--accent)' } : undefined}
         >
           {current === 'already_applied' ? '✓ Applied' : 'I applied'}
         </button>

@@ -262,16 +262,14 @@ export function TokenMatchDetail({ token, grantId }: { token: string; grantId: s
               disabled={pending}
               aria-pressed={current === 'more_like_this'}
               onClick={() => doFeedback('more_like_this')}
-              style={current === 'more_like_this' ? { borderColor: 'var(--accent)', color: 'var(--accent)' } : undefined}
             >
               👍 Relevant
             </button>
             <button
-              className="btn btn--ghost"
+              className="btn btn--ghost btn--danger"
               disabled={pending}
               aria-pressed={current === 'not_relevant'}
               onClick={() => doFeedback('not_relevant')}
-              style={current === 'not_relevant' ? { borderColor: '#c0392b', color: '#c0392b' } : undefined}
             >
               👎 Not relevant
             </button>
@@ -280,7 +278,6 @@ export function TokenMatchDetail({ token, grantId }: { token: string; grantId: s
               disabled={pending}
               aria-pressed={current === 'already_applied'}
               onClick={doApplied}
-              style={current === 'already_applied' ? { borderColor: 'var(--accent)', color: 'var(--accent)' } : undefined}
             >
               {current === 'already_applied' ? '✓ Applied' : 'I applied'}
             </button>

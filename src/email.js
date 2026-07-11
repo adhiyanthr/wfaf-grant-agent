@@ -258,12 +258,19 @@ export async function sendDigest(org, grants) {
   const subject = `🌱 ${n} new high-fit match${n !== 1 ? 'es' : ''} this week – ${org.name}`;
   const html = buildEmail(org, grants);
 
-  // Extra recipients managed by the org in the Profile editor
-  // (organizations.digest_recipients). De-dup and drop the primary email so it
-  // isn't listed twice.
-  const extras = Array.isArray(org.digest_recipients) ? org.digest_recipients : [];
+  // Extra recipients come from the DIGEST_RECIPIENTS env var (a GitHub Actions
+  // repo variable, comma-separated) — org-managed in GitHub, not in the app.
+  // Deliberately WFAF-only, like dashboardUrl(): these are Wagner Farm staff
+  // addresses and must never be attached to some other org's digest.
+  const extras =
+    (org.email || '').toLowerCase() === WFAF_DASHBOARD_EMAIL
+      ? (process.env.DIGEST_RECIPIENTS || '')
+          .split(',')
+          .map((e) => e.trim().toLowerCase())
+          .filter(Boolean)
+      : [];
   const recipients = [
-    ...new Set([org.email, ...extras.filter((e) => e && e !== org.email)]),
+    ...new Set([org.email, ...extras.filter((e) => e !== (org.email || '').toLowerCase())]),
   ];
 
   // One-click unsubscribe (RFC 8058) so Gmail/Outlook render a native
