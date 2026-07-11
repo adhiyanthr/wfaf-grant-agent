@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Nav } from './components/Nav'
+import { SitePasswordGate } from './components/SitePasswordGate'
 import { Login } from './pages/Login'
 import { ResetPassword } from './pages/ResetPassword'
 import { Matches } from './pages/Matches'
@@ -9,6 +10,9 @@ import { NotFound } from './pages/NotFound'
 import { TokenDashboard } from './pages/TokenDashboard'
 import { TokenMatchDetail } from './pages/TokenMatchDetail'
 import { TokenSettings } from './pages/TokenSettings'
+import { TokenApplied } from './pages/TokenApplied'
+import { TokenAdmin } from './pages/TokenAdmin'
+import { TokenHandoff } from './pages/TokenHandoff'
 
 // The bare root URL goes straight to the Wagner Farm token dashboard — no
 // login. This app has exactly one org, so there's nothing to route root to
@@ -34,16 +38,23 @@ function App() {
   // The token-gated dashboard is a self-contained, session-free view. It must
   // NOT render <Nav> (which calls supabase.auth and shows sign-in chrome) — the
   // token IS the credential. Branch out before anything auth-aware renders.
+  // The whole site sits behind the shared SitePasswordGate curtain.
   if (page.startsWith('/dashboard/')) {
     const parts = page.split('/') // ['', 'dashboard', token, subpage?, grantId?]
     const token = parts[2]
     const subpage = parts[3]
     const grantId = parts[4]
     if (!token) return <NotFound />
-    if (subpage === 'settings') return <TokenSettings token={token} />
-    if (subpage === 'matches' && grantId)
-      return <TokenMatchDetail token={token} grantId={grantId} />
-    return <TokenDashboard token={token} />
+    const tokenPage = () => {
+      if (subpage === 'settings') return <TokenSettings token={token} />
+      if (subpage === 'applied') return <TokenApplied token={token} />
+      if (subpage === 'admin')
+        return grantId === 'handoff' ? <TokenHandoff token={token} /> : <TokenAdmin token={token} />
+      if (subpage === 'matches' && grantId)
+        return <TokenMatchDetail token={token} grantId={grantId} />
+      return <TokenDashboard token={token} />
+    }
+    return <SitePasswordGate>{tokenPage()}</SitePasswordGate>
   }
 
   const renderPage = () => {
@@ -66,10 +77,10 @@ function App() {
   }
 
   return (
-    <>
+    <SitePasswordGate>
       <Nav />
       {renderPage()}
-    </>
+    </SitePasswordGate>
   )
 }
 

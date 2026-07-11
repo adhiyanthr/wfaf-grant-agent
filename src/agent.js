@@ -113,7 +113,7 @@ export async function searchGrantsForOrg(org, feedback = []) {
 Run these ${searches.length} web searches this week, then compile the results:
 ${searchList}
 
-Search thoroughly for all open grants that ${org.name} qualifies for. Cover federal, ${stateLabel(org)} state, and private foundation sources relevant to its focus areas. Only include grants with future deadlines or upcoming open cycles.
+Search thoroughly for all open grants that ${org.name} qualifies for. Cover federal, ${stateLabel(org)} state, and private foundation sources relevant to its focus areas. Only include grants that can be applied to right now with a deadline within the next 3 months (rolling/no-deadline grants that are open today are fine). If nothing new is genuinely worth applying to, return an empty array [] — never pad the list.
 
 For each grant, extract the application deadline if it is mentioned. Return it as an ISO date string (YYYY-MM-DD). If no deadline is mentioned, return null. Do not invent deadlines.
 
@@ -169,6 +169,14 @@ Return results as a raw JSON array only — no text, no markdown.`,
       const deadline = new Date(g.deadline + 'T00:00:00');
       if (deadline < now) {
         console.warn('  Skipping expired grant:', g.title, g.deadline);
+        return false;
+      }
+      // Only surface grants that can be applied to soon: the dashboard hides
+      // anything past this window too (dashboard-view APPLY_WINDOW_DAYS).
+      const windowEnd = new Date(now);
+      windowEnd.setDate(windowEnd.getDate() + 90);
+      if (deadline > windowEnd) {
+        console.warn('  Skipping far-future grant (>90d):', g.title, g.deadline);
         return false;
       }
     }

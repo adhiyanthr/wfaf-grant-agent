@@ -1,5 +1,11 @@
 import { useState, useEffect } from 'react'
-import { fetchTokenSettings, updateTokenSettings, SettingsOrg, DashboardError } from '../lib/tokenDashboard'
+import {
+  fetchTokenSettings,
+  updateTokenSettings,
+  changeSitePassword,
+  SettingsOrg,
+  DashboardError,
+} from '../lib/tokenDashboard'
 import { previewSearches } from '../lib/searchPreview'
 import { TokenNav } from '../components/TokenNav'
 
@@ -169,7 +175,7 @@ export function TokenSettings({ token }: { token: string }) {
             <label htmlFor="what_we_do">What you do</label>
             <textarea
               id="what_we_do"
-              rows={6}
+              rows={4}
               value={form.what_we_do}
               onChange={(e) => setForm({ ...form, what_we_do: e.target.value })}
             />
@@ -179,7 +185,7 @@ export function TokenSettings({ token }: { token: string }) {
             <label htmlFor="target_population">Who you serve</label>
             <textarea
               id="target_population"
-              rows={5}
+              rows={4}
               value={form.target_population}
               onChange={(e) => setForm({ ...form, target_population: e.target.value })}
             />
@@ -295,7 +301,108 @@ export function TokenSettings({ token }: { token: string }) {
           {saving ? 'Saving…' : 'Save settings'}
         </button>
       </form>
+
+      <SitePasswordCard token={token} />
       </div>
     </>
+  )
+}
+
+// Its own <form> (the settings form above can't nest one). Changes the shared
+// password that gates the whole site; the server verifies the current password
+// and stores only hashes. Browsers that already unlocked stay unlocked.
+function SitePasswordCard({ token }: { token: string }) {
+  const [current, setCurrent] = useState('')
+  const [next, setNext] = useState('')
+  const [confirm, setConfirm] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setMsg(null)
+    if (next !== confirm) {
+      setMsg({ kind: 'err', text: 'The two new passwords do not match.' })
+      return
+    }
+    setBusy(true)
+    try {
+      await changeSitePassword(token, current, next)
+      setCurrent('')
+      setNext('')
+      setConfirm('')
+      setMsg({ kind: 'ok', text: 'Site password changed. Share the new one with your team.' })
+    } catch (err) {
+      const code = err instanceof DashboardError ? err.code : ''
+      setMsg({
+        kind: 'err',
+        text:
+          code === 'wrong_password'
+            ? 'The current password is incorrect.'
+            : code === 'weak_password'
+              ? 'New password must be at least 8 characters.'
+              : "Couldn't change the password. Please try again.",
+      })
+    }
+    setBusy(false)
+  }
+
+  return (
+    <form onSubmit={submit}>
+      <div className="card" style={{ marginTop: '32px', marginBottom: '20px' }}>
+        <h2 style={{ fontSize: '1.15rem', marginBottom: '6px' }}>Site password</h2>
+        <p className="muted" style={{ fontSize: '0.9rem', marginBottom: '16px' }}>
+          The shared password everyone types to open this website. Changing it doesn't lock out
+          browsers that have already unlocked.
+        </p>
+
+        <div className="form-group">
+          <label htmlFor="pw_current">Current password</label>
+          <input
+            id="pw_current"
+            type="password"
+            required
+            autoComplete="current-password"
+            value={current}
+            onChange={(e) => setCurrent(e.target.value)}
+            style={{ width: '100%' }}
+          />
+        </div>
+        <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+          <div className="form-group" style={{ flex: 1, minWidth: '200px' }}>
+            <label htmlFor="pw_next">New password</label>
+            <input
+              id="pw_next"
+              type="password"
+              required
+              minLength={8}
+              autoComplete="new-password"
+              value={next}
+              onChange={(e) => setNext(e.target.value)}
+              style={{ width: '100%' }}
+            />
+          </div>
+          <div className="form-group" style={{ flex: 1, minWidth: '200px' }}>
+            <label htmlFor="pw_confirm">Repeat new password</label>
+            <input
+              id="pw_confirm"
+              type="password"
+              required
+              minLength={8}
+              autoComplete="new-password"
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
+              style={{ width: '100%' }}
+            />
+          </div>
+        </div>
+
+        {msg && <div className={`alert ${msg.kind === 'ok' ? 'success' : 'error'}`}>{msg.text}</div>}
+
+        <button type="submit" disabled={busy || !current || !next || !confirm}>
+          {busy ? 'Saving…' : 'Change site password'}
+        </button>
+      </div>
+    </form>
   )
 }

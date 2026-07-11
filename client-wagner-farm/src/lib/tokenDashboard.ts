@@ -121,6 +121,65 @@ export interface SettingsOrg {
   frequency_days: number | null
 }
 
+// Grants whose latest feedback is "I applied", with when each was marked.
+// Server-side and not deadline-filtered, so applications outlive the matches
+// view's 3-month window.
+export interface AppliedData {
+  matches: Match[]
+  applied_at: Record<string, string>
+}
+
+export function fetchAppliedList(token: string): Promise<AppliedData> {
+  return call({ token, action: 'applied_list' })
+}
+
+// Change the shared site password from Settings (authorized by the current
+// site password) — the server verifies and stores only hashes.
+export function changeSitePassword(
+  token: string,
+  currentPassword: string,
+  newPassword: string
+): Promise<void> {
+  return call({
+    token,
+    action: 'site_password_change',
+    current_password: currentPassword,
+    new_password: newPassword,
+  }).then(() => {})
+}
+
+// Admin actions. The admin password is sent with every call and re-verified
+// server-side each time — the client never decides whether it's correct.
+export function verifyAdmin(token: string, adminPassword: string): Promise<void> {
+  return call({ token, action: 'admin_verify', admin_password: adminPassword }).then(() => {})
+}
+
+export function changeAdminPassword(
+  token: string,
+  adminPassword: string,
+  newPassword: string
+): Promise<void> {
+  return call({
+    token,
+    action: 'admin_change_password',
+    admin_password: adminPassword,
+    new_password: newPassword,
+  }).then(() => {})
+}
+
+export function changeSitePasswordAsAdmin(
+  token: string,
+  adminPassword: string,
+  newPassword: string
+): Promise<void> {
+  return call({
+    token,
+    action: 'site_password_change',
+    admin_password: adminPassword,
+    new_password: newPassword,
+  }).then(() => {})
+}
+
 export function fetchTokenSettings(token: string): Promise<{ org: SettingsOrg }> {
   return call({ token, action: 'settings_get' })
 }

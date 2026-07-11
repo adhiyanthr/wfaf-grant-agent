@@ -18,6 +18,22 @@ functions in `supabase/functions/`. Full overview: `README.md`.
   runs from `main` — fixes only take effect there once merged, not on a branch.
 - **Resend sending domain:** `grantequity.org` (verified). `MAIL_FROM` =
   `GrantEquity <grants@grantequity.org>`.
+- **Wagner Farm site passwords:** the client dashboard (`client-wagner-farm/`,
+  root URL) sits behind a soft site-password gate; a separate admin password
+  gates `/dashboard/<token>/admin` (password changes, on-demand refresh, the
+  ownership handoff guide). Both are SHA-256 hashes in `app_settings`
+  (`site_password_hash` / `admin_password_hash`, seeded by
+  `migrations/wf_site_admin_password.sql`); admin actions are re-verified
+  server-side in `dashboard-view` on every call.
+- **3-month apply window:** the agent only keeps grants with deadlines ≤90 days
+  out (`src/agent.js` guard + prompt rules in `src/profile.js`), and
+  `dashboard-view`'s `view` hides expired/far-future matches
+  (`APPLY_WINDOW_DAYS`). No rows are deleted — the `applied_list` action
+  (Applied page) is deliberately unfiltered.
+- **Extra digest recipients** come from the `DIGEST_RECIPIENTS` repo Variable
+  (comma-separated), merged in `sendDigest` for the WFAF org only. The old
+  per-org `organizations.digest_recipients` column is no longer read or
+  editable in the app.
 
 ## Gotchas (these have bitten us)
 - **Live DB has schema drift.** The `organizations` table was created by the
@@ -51,7 +67,9 @@ TARGET_ORG_EMAIL=x@y.com node src/index.js # single org
 - GitHub **Secrets:** `ANTHROPIC_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`,
   `RESEND_API_KEY`.
 - GitHub **Variables:** `MAIL_FROM`, `UNSUBSCRIBE_BASE_URL`, `MAILING_ADDRESS`,
-  `APP_BASE_URL` (platform SPA base URL for email deep-links to `/matches/:id`).
+  `APP_BASE_URL` (platform SPA base URL for email deep-links to `/matches/:id`),
+  `DASHBOARD_BASE_URL` (Wagner Farm dashboard link in digest footers),
+  `DIGEST_RECIPIENTS` (extra WFAF digest recipients, comma-separated).
 - Function secrets (set via `supabase secrets set`): `CONFIRM_WEBHOOK_SECRET`,
   `RESEND_WEBHOOK_SECRET`, `FEEDBACK_WEBHOOK_SECRET`, `MAIL_FROM`, `RESEND_API_KEY`,
   `UNSUBSCRIBE_BASE_URL`.
