@@ -25,11 +25,12 @@ functions in `supabase/functions/`. Full overview: `README.md`.
   (`site_password_hash` / `admin_password_hash`, seeded by
   `migrations/wf_site_admin_password.sql`); admin actions are re-verified
   server-side in `dashboard-view` on every call.
-- **3-month apply window:** the agent only keeps grants with deadlines ≤90 days
-  out (`src/agent.js` guard + prompt rules in `src/profile.js`), and
-  `dashboard-view`'s `view` hides expired/far-future matches
-  (`APPLY_WINDOW_DAYS`). No rows are deleted — the `applied_list` action
-  (Applied page) is deliberately unfiltered.
+- **3-month apply window:** every grant must have a CONFIRMED deadline ≤90 days
+  out — undated/rolling grants are rejected by the agent (`src/agent.js` guard
+  + prompt rules in `src/profile.js`) and hidden by `dashboard-view`'s `view`
+  (`APPLY_WINDOW_DAYS`). The catalog was purged of undated/out-of-window rows
+  on 2026-07-11. The `applied_list` action (Applied page) is deliberately
+  unfiltered.
 - **Extra digest recipients** come from the `DIGEST_RECIPIENTS` repo Variable
   (comma-separated), merged in `sendDigest` for the WFAF org only. The old
   per-org `organizations.digest_recipients` column is no longer read or

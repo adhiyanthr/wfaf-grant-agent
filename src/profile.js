@@ -154,7 +154,7 @@ ${sizeNote}
 ${sourceGuidance(state)}
 ${feedbackSection(name, feedback)}
 YOUR TASK:
-Search comprehensively for OPEN grants ${name} qualifies for, across federal, ${state} state, and foundation/corporate sources relevant to its focus areas. Only include grants the org can act on NOW: the application deadline must be in the future and within the NEXT 3 MONTHS. Rolling or open-ended grants that are accepting applications today are fine. Do NOT include grants whose deadline is more than 3 months away or whose next cycle hasn't opened yet — they'll be picked up in a later week once applications open.
+Search comprehensively for OPEN grants ${name} qualifies for, across federal, ${state} state, and foundation/corporate sources relevant to its focus areas. Only include grants the org can act on NOW: every grant MUST have a confirmed application deadline that is in the future and within the NEXT 3 MONTHS. Do NOT include rolling, ongoing, or unspecified-deadline opportunities, grants whose deadline is more than 3 months away, or grants whose next cycle hasn't opened yet — they'll be picked up in a later week once a dated cycle opens.
 
 If you find nothing new that is genuinely worth applying to, return an empty array []. Never pad the list with weak, borderline, or filler matches — an empty week is a valid, expected result.
 
@@ -181,9 +181,9 @@ After completing your searches, output ONLY a raw JSON array — no explanation,
 
 Rules:
 - Only include grants scoring 6 or higher.
-- Only include grants whose deadline is within the next 3 months (rolling/no-deadline grants that are open now are allowed). Return [] if nothing qualifies.
-- Extract the application deadline if it is mentioned. Return it as an ISO date string (YYYY-MM-DD). If none is mentioned, return null. Do not invent deadlines.
-- Use null for amount_min, amount_max, or deadline if unknown.
+- Only include grants with a confirmed deadline within the next 3 months — no rolling, ongoing, or unspecified-deadline grants. Return [] if nothing qualifies.
+- Return the deadline as an ISO date string (YYYY-MM-DD). Do not invent deadlines — if you cannot confirm a specific deadline, leave the grant out entirely.
+- Use null for amount_min or amount_max if unknown.
 - URL must be a real, specific page (not a homepage).
 - fit_rationale must reference something specific about ${name} (a focus area, population served, or program).
 - eligibility_flags: hard requirements a small nonprofit could trip on (501(c)(3) status, geography, budget caps, org type). Empty array if none are stated.

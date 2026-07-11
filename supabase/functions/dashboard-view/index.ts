@@ -48,17 +48,16 @@ function redact(token: unknown): string {
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-// Matches are only shown while they can realistically be applied to: deadline
-// today..+90 days. Expired and far-future grants are hidden from the dashboard
-// (not deleted — feedback/applied history must survive, and a far-out grant
-// reappears once its deadline enters the window). No-deadline (rolling) grants
-// stay visible. The agent enforces the same window at sourcing time.
+// Matches are only shown while they can realistically be applied to: a
+// CONFIRMED deadline today..+90 days. Expired, far-future, and undated grants
+// are hidden from the matches view (the agent also refuses to save them, and
+// the catalog was purged of them). Applied history (applied_list) is exempt.
 const APPLY_WINDOW_DAYS = 90;
 const DAY_MS = 24 * 60 * 60 * 1000;
 function inApplyWindow(deadline: unknown): boolean {
-  if (typeof deadline !== 'string' || !deadline) return true;
+  if (typeof deadline !== 'string' || !deadline) return false;
   const d = new Date(deadline + 'T00:00:00');
-  if (isNaN(d.getTime())) return true;
+  if (isNaN(d.getTime())) return false;
   const days = Math.ceil((d.getTime() - Date.now()) / DAY_MS);
   return days >= 0 && days <= APPLY_WINDOW_DAYS;
 }
