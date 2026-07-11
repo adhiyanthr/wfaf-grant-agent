@@ -34,7 +34,7 @@ function PasswordChangeCard({
   onSubmit,
 }: {
   title: string
-  blurb: string
+  blurb?: string
   buttonLabel: string
   onSubmit: (newPassword: string) => Promise<void>
 }) {
@@ -64,8 +64,8 @@ function PasswordChangeCard({
 
   return (
     <div className="card" style={{ marginBottom: '20px' }}>
-      <h2 style={{ fontSize: '1.15rem', marginBottom: '6px' }}>{title}</h2>
-      <p className="muted" style={{ fontSize: '0.9rem', marginBottom: '16px' }}>{blurb}</p>
+      <h2 style={{ fontSize: '1.15rem', marginBottom: '16px' }}>{title}</h2>
+      {blurb && <p className="muted" style={{ fontSize: '0.9rem', margin: '-10px 0 16px' }}>{blurb}</p>}
       <form onSubmit={submit}>
         <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
           <div className="form-group" style={{ flex: 1, minWidth: '200px' }}>
@@ -161,7 +161,7 @@ export function TokenAdmin({ token }: { token: string }) {
           <div className="card" style={{ maxWidth: '420px', margin: '40px auto 0' }}>
             <h1 style={{ fontSize: '1.4rem', marginBottom: '8px' }}>Admin</h1>
             <p className="muted" style={{ marginBottom: '20px' }}>
-              This area is for Wagner Farm staff. Enter the admin password to continue.
+              Enter the admin password to continue.
             </p>
             <form onSubmit={login}>
               <div className="form-group">
@@ -225,14 +225,13 @@ export function TokenAdmin({ token }: { token: string }) {
 
         <PasswordChangeCard
           title="Change the site password"
-          blurb="The shared password everyone types to see this website at all. Anyone who already unlocked a browser stays unlocked on that browser."
           buttonLabel="Change site password"
           onSubmit={(next) => changeSitePasswordAsAdmin(token, adminPw, next)}
         />
 
         <PasswordChangeCard
           title="Change the admin password"
-          blurb="The password for this Admin area. Change it as soon as you take over — after that, only Wagner Farm staff can get in here."
+          blurb="The password for this Admin area."
           buttonLabel="Change admin password"
           onSubmit={async (next) => {
             await changeAdminPassword(token, adminPw, next)
