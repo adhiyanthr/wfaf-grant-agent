@@ -51,6 +51,14 @@ functions in `supabase/functions/`. Full overview: `README.md`.
   `secrets set/list`). The CLI is run via `npx -y supabase` (not installed globally).
 - **Database Webhooks need enabling once** (installs `pg_net` +
   `supabase_functions` schema) before any webhook can be created.
+- **Wagner Farm dashboard deploys are MANUAL, and the real domain is
+  `https://wagner-farm-grants.vercel.app`** — there is no Vercel git
+  integration, so merging to main does NOT redeploy the SPA; run
+  `npx vercel deploy --prod` from `client-wagner-farm/`.
+  `client-wagner-farm.vercel.app` is dead (DEPLOYMENT_NOT_FOUND).
+- **Supabase CLI keychain prompts can't be answered on this machine** — put
+  `SUPABASE_ACCESS_TOKEN=<personal access token>` in `.env` and pass it as an
+  env var to `npx supabase` commands to bypass the keychain entirely.
 
 ## Common commands
 ```bash
