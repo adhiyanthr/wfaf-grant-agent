@@ -431,6 +431,9 @@ Deno.serve(async (req) => {
       county: org.county,
       state: org.state,
       last_sent: org.last_sent,
+      // So the dashboard can show the real (cadence-aware) next run date, not
+      // just the nearest Monday.
+      frequency_days: org.frequency_days,
     },
     matches: visible,
     feedback: feedback ?? [],
