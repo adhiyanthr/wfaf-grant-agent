@@ -25,6 +25,7 @@ export interface DashboardOrg {
   county: string | null
   state: string | null
   last_sent: string | null
+  frequency_days: number | null
 }
 
 export type FeedbackResponse = 'not_relevant' | 'more_like_this' | 'already_applied'

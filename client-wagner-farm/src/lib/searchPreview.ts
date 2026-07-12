@@ -69,6 +69,29 @@ export function nextMondayRun(now = new Date()): Date {
   return candidate
 }
 
+// The cron fires every Monday, but the agent skips an org until
+// last_sent + frequency_days has passed (see src/index.js). So the real next
+// run is the first Monday cron on or after that due date. Mirrors that logic
+// so the dashboard shows when a search will ACTUALLY happen, not just the
+// nearest Monday. Falls back to the plain next Monday when there's no prior
+// send or the cadence is weekly-or-faster.
+const DAY_MS = 24 * 60 * 60 * 1000
+export function nextScheduledRun(
+  lastSent: string | null,
+  frequencyDays: number | null,
+  now = new Date()
+): Date {
+  const days = Number(frequencyDays)
+  if (!lastSent || !Number.isFinite(days) || days <= 7) {
+    return nextMondayRun(now)
+  }
+  const dueAt = new Date(lastSent).getTime() + days * DAY_MS
+  // The org isn't due until dueAt; find the first Monday cron at/after it
+  // (but never earlier than the next Monday from now).
+  const from = new Date(Math.max(now.getTime(), dueAt))
+  return nextMondayRun(from)
+}
+
 export function formatDateTime(d: Date | null): string {
   if (!d) return '—'
   return d.toLocaleString(undefined, {

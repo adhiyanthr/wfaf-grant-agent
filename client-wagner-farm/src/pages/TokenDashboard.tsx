@@ -9,7 +9,7 @@ import {
   FeedbackResponse,
 } from '../lib/tokenDashboard'
 import { Match, displayScore, formatAmount, daysUntil } from '../lib/matches'
-import { nextMondayRun, formatDateTime } from '../lib/searchPreview'
+import { nextScheduledRun, formatDateTime } from '../lib/searchPreview'
 import { TokenNav } from '../components/TokenNav'
 
 // Set Referrer-Policy for this no-login view via a runtime meta tag as well as
@@ -334,7 +334,9 @@ export function TokenDashboard({ token }: { token: string }) {
             <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: 'var(--ink-3)', letterSpacing: '0.03em' }}>
               Next automatic search
             </div>
-            <div style={{ fontWeight: 600 }}>{formatDateTime(nextMondayRun())}</div>
+            <div style={{ fontWeight: 600 }}>
+              {formatDateTime(nextScheduledRun(org.last_sent, org.frequency_days))}
+            </div>
           </div>
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center' }}>
             <button className="btn btn--ghost" onClick={handleRefresh} disabled={refreshing}>
