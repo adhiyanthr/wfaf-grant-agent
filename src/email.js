@@ -67,10 +67,16 @@ function unsubscribeUrl(org) {
   return `${base.replace(/\/$/, '')}/unsubscribe?token=${org.unsubscribe_token}`;
 }
 
-// Deep link into the SPA for a match (org_grants.id). Returns null when
-// APP_BASE_URL is unset or the grant has no match_id, so the card falls back to
-// the external grant link only.
-function matchUrl(g) {
+// Deep link to a match's detail page. WFAF gets its token-gated dashboard
+// match page (matches the "View all your matches" footer link); every other
+// org gets the platform SPA. Returns null when the relevant base URL/id is
+// missing, so the card falls back to the external grant link only.
+function matchUrl(org, g) {
+  if ((org.email || '').toLowerCase() === WFAF_DASHBOARD_EMAIL) {
+    const base = process.env.DASHBOARD_BASE_URL;
+    if (!base || !org.dashboard_token || !g.match_id) return null;
+    return `${base.replace(/\/$/, '')}/dashboard/${org.dashboard_token}/matches/${g.match_id}`;
+  }
   const base = process.env.APP_BASE_URL;
   if (!base || !g.match_id) return null;
   return `${base.replace(/\/$/, '')}/matches/${g.match_id}`;
@@ -87,7 +93,7 @@ function confidenceBadgeHtml(g) {
   ">⚠ Limited data</span>`;
 }
 
-function buildGrantCard(g, urgent) {
+function buildGrantCard(org, g, urgent) {
   const amount = formatAmount(g.amount_min, g.amount_max);
   const tags = (g.tags || []).map((t) => `#${t}`).join(' ');
 
@@ -143,7 +149,7 @@ function buildGrantCard(g, urgent) {
       ${tags ? `<p style="margin: 4px 0 8px; font-size: 12px; color: #888;">${tags}</p>` : ''}
 
       ${(() => {
-        const appUrl = matchUrl(g);
+        const appUrl = matchUrl(org, g);
         // Primary CTA is the in-app match page (where the org can act on the
         // match); the external funder page is kept as a secondary link.
         const primary = appUrl
@@ -224,12 +230,12 @@ function buildEmail(org, grants) {
   if (closingSoon.length) {
     sections +=
       sectionHeader('⏰ Closing Soon — Act Now') +
-      closingSoon.map((g) => buildGrantCard(g, true)).join('');
+      closingSoon.map((g) => buildGrantCard(org, g, true)).join('');
   }
   if (newThisWeek.length) {
     sections +=
       sectionHeader('🆕 New This Week') +
-      newThisWeek.map((g) => buildGrantCard(g, false)).join('');
+      newThisWeek.map((g) => buildGrantCard(org, g, false)).join('');
   }
 
   return `
