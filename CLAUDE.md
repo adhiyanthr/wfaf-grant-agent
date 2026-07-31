@@ -35,6 +35,11 @@ functions in `supabase/functions/`. Full overview: `README.md`.
   (comma-separated), merged in `sendDigest` for the WFAF org only. The old
   per-org `organizations.digest_recipients` column is no longer read or
   editable in the app.
+- **Email kill-switch:** the `SUPPRESS_DIGESTS` repo Variable (truthy =
+  `1/true/yes/on`) makes the agent keep searching + saving matches to the
+  dashboard but send NO digest emails to any org (`runForOrg` in
+  `src/index.js`; also skips `markOrgDigestSent`, so orgs stay "due" and keep
+  searching). Clear/delete the Variable to resume sending.
 
 ## Gotchas (these have bitten us)
 - **Live DB has schema drift.** The `organizations` table was created by the

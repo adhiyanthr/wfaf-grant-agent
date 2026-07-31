@@ -10,6 +10,14 @@ import {
 } from './db.js';
 import { sendDigest } from './email.js';
 
+// Global email kill-switch. When the SUPPRESS_DIGESTS env var is truthy
+// (1/true/yes/on), the agent still searches and saves matches but sends no
+// digest emails to any org. Set via the SUPPRESS_DIGESTS repo Variable; clear
+// it to resume sending.
+const EMAILS_SUPPRESSED = /^(1|true|yes|on)$/i.test(
+  (process.env.SUPPRESS_DIGESTS || '').trim()
+);
+
 // Full per-org pipeline: search -> dedup -> persist -> email -> mark sent.
 async function runForOrg(org) {
   console.log(`\n[${org.email}] ${org.name} — starting`);
@@ -44,6 +52,18 @@ async function runForOrg(org) {
   // saveOrgGrants dedupes by url and stamps each grant with its catalog id;
   // use its returned array so the digest/marking match what was persisted.
   const savedGrants = await saveOrgGrants(org.id, scoredGrants);
+
+  // Email kill-switch: when SUPPRESS_DIGESTS is truthy, keep searching and
+  // saving (so the dashboard still fills in with fresh matches) but send NO
+  // email. Deliberately also skips markOrgDigestSent so last_sent / digest_sent_at
+  // aren't stamped for a digest that never went out — the org stays "due" and
+  // keeps searching every cron. Flip off by clearing the SUPPRESS_DIGESTS repo
+  // Variable. See .github/workflows/grant-agent.yml.
+  if (EMAILS_SUPPRESSED) {
+    console.log(`  Emails paused (SUPPRESS_DIGESTS) — ${savedGrants.length} grants saved to dashboard, no email sent.`);
+    return { sent: 0 };
+  }
+
   await sendDigest(org, savedGrants);
   await markOrgDigestSent(org.id, savedGrants.map((g) => g.id).filter(Boolean));
 
@@ -54,6 +74,10 @@ async function runForOrg(org) {
 async function run() {
   const start = Date.now();
   const target = process.env.TARGET_ORG_EMAIL?.trim();
+
+  if (EMAILS_SUPPRESSED) {
+    console.log('*** SUPPRESS_DIGESTS is ON — searching + saving matches, but NO emails will be sent. ***');
+  }
 
   let orgs;
   if (target) {

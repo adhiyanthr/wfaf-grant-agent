@@ -50,6 +50,10 @@ jobs:
           # Comma-separated extra digest recipients (WFAF staff), applied to the
           # Wagner Farm org only — see sendDigest() in src/email.js.
           DIGEST_RECIPIENTS: ${{ vars.DIGEST_RECIPIENTS }}
+          # Email kill-switch. Truthy (1/true/yes/on) = keep searching + saving
+          # matches to the dashboard but send NO digest emails. Clear the
+          # variable to resume sending. See runForOrg() in src/index.js.
+          SUPPRESS_DIGESTS: ${{ vars.SUPPRESS_DIGESTS }}
           # Platform SPA base URL for email deep-links (${APP_BASE_URL}/matches/:id).
           APP_BASE_URL: ${{ vars.APP_BASE_URL }}
           # Wagner Farm dashboard base URL for the digest footer link (the repo
