@@ -48,16 +48,16 @@ function redact(token: unknown): string {
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-// Matches are only shown while they can realistically be applied to: a
-// CONFIRMED deadline today..+90 days. Expired, far-future, and undated grants
-// are hidden from the matches view (the agent also refuses to save them, and
-// the catalog was purged of them). Applied history (applied_list) is exempt.
+// Matches shown on the dashboard: rolling/undated grants (no deadline) are
+// always shown — they're accepting applications now; DATED grants are shown
+// only while applicable (deadline today..+90 days), so expired and far-future
+// dated grants are hidden. Applied history (applied_list) is exempt.
 const APPLY_WINDOW_DAYS = 90;
 const DAY_MS = 24 * 60 * 60 * 1000;
 function inApplyWindow(deadline: unknown): boolean {
-  if (typeof deadline !== 'string' || !deadline) return false;
+  if (typeof deadline !== 'string' || !deadline) return true; // rolling/undated
   const d = new Date(deadline + 'T00:00:00');
-  if (isNaN(d.getTime())) return false;
+  if (isNaN(d.getTime())) return true; // unparseable -> treat as rolling
   const days = Math.ceil((d.getTime() - Date.now()) / DAY_MS);
   return days >= 0 && days <= APPLY_WINDOW_DAYS;
 }

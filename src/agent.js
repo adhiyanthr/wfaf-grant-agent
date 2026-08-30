@@ -113,9 +113,9 @@ export async function searchGrantsForOrg(org, feedback = []) {
 Run these ${searches.length} web searches this week, then compile the results:
 ${searchList}
 
-Search thoroughly for all open grants that ${org.name} qualifies for. Cover federal, ${stateLabel(org)} state, and private foundation sources relevant to its focus areas. Every grant MUST have a confirmed application deadline within the next 3 months — do not include rolling, ongoing, or unspecified-deadline opportunities. If nothing new is genuinely worth applying to, return an empty array [] — never pad the list.
+Search thoroughly for all open grants that ${org.name} qualifies for. Cover federal, ${stateLabel(org)} state, and private foundation sources relevant to its focus areas. Include a grant if EITHER it has a confirmed deadline in the next 3 months, OR it is rolling/open-ended and accepting applications right now. Exclude expired grants and grants whose deadline is more than 3 months out. If nothing new is genuinely worth applying to, return an empty array [] — never pad the list.
 
-For each grant, extract the confirmed application deadline as an ISO date string (YYYY-MM-DD). Do not invent deadlines — if a specific deadline cannot be confirmed, leave that grant out entirely.
+For each grant, return the application deadline as an ISO date string (YYYY-MM-DD) when there is a confirmed one, or null for rolling/open-ended grants. Do not invent deadlines.
 
 Return results as a raw JSON array only — no text, no markdown.`,
       },
@@ -165,23 +165,25 @@ Return results as a raw JSON array only — no text, no markdown.`,
     if (typeof g.fit_score !== 'number' || g.fit_score < 6) {
       return false;
     }
-    // Every kept grant needs a confirmed deadline inside the 90-day apply
-    // window — no undated/rolling grants (the dashboard hides them and the
-    // catalog was purged of them; see dashboard-view APPLY_WINDOW_DAYS).
+    // Dated grants must fall inside the 90-day apply window; rolling/undated
+    // grants (null deadline) are allowed through — they're accepting
+    // applications now. Only DATED grants are range-checked. (The dashboard
+    // shows undated grants too; see dashboard-view inApplyWindow.)
     const deadline = g.deadline ? new Date(g.deadline + 'T00:00:00') : null;
-    if (!deadline || isNaN(deadline.getTime())) {
-      console.warn('  Skipping grant without a confirmed deadline:', g.title);
-      return false;
-    }
-    if (deadline < now) {
-      console.warn('  Skipping expired grant:', g.title, g.deadline);
-      return false;
-    }
-    const windowEnd = new Date(now);
-    windowEnd.setDate(windowEnd.getDate() + 90);
-    if (deadline > windowEnd) {
-      console.warn('  Skipping far-future grant (>90d):', g.title, g.deadline);
-      return false;
+    if (deadline && !isNaN(deadline.getTime())) {
+      if (deadline < now) {
+        console.warn('  Skipping expired grant:', g.title, g.deadline);
+        return false;
+      }
+      const windowEnd = new Date(now);
+      windowEnd.setDate(windowEnd.getDate() + 90);
+      if (deadline > windowEnd) {
+        console.warn('  Skipping far-future grant (>90d):', g.title, g.deadline);
+        return false;
+      }
+    } else {
+      // Normalize any unparseable/empty deadline to null (rolling grant).
+      g.deadline = null;
     }
 
     // New analysis fields are best-effort: sanitize, never reject the grant.
