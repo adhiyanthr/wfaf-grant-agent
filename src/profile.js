@@ -154,7 +154,10 @@ ${sizeNote}
 ${sourceGuidance(state)}
 ${feedbackSection(name, feedback)}
 YOUR TASK:
-Search comprehensively for OPEN grants ${name} qualifies for, across federal, ${state} state, and foundation/corporate sources relevant to its focus areas. Only include grants the org can act on NOW: every grant MUST have a confirmed application deadline that is in the future and within the NEXT 3 MONTHS. Do NOT include rolling, ongoing, or unspecified-deadline opportunities, grants whose deadline is more than 3 months away, or grants whose next cycle hasn't opened yet — they'll be picked up in a later week once a dated cycle opens.
+Search comprehensively for OPEN grants ${name} qualifies for, across federal, ${state} state, and foundation/corporate sources relevant to its focus areas. Only include grants the org can act on NOW — that means EITHER:
+  (a) the application has a confirmed deadline in the future and within the NEXT 3 MONTHS, OR
+  (b) the grant is rolling / ongoing / open-ended and is accepting applications right now (no fixed deadline).
+Do NOT include grants whose deadline has already passed, grants whose deadline is more than 3 months away, or grants whose next cycle hasn't opened yet — those will be picked up in a later week.
 
 If you find nothing new that is genuinely worth applying to, return an empty array []. Never pad the list with weak, borderline, or filler matches — an empty week is a valid, expected result.
 
@@ -181,8 +184,8 @@ After completing your searches, output ONLY a raw JSON array — no explanation,
 
 Rules:
 - Only include grants scoring 6 or higher.
-- Only include grants with a confirmed deadline within the next 3 months — no rolling, ongoing, or unspecified-deadline grants. Return [] if nothing qualifies.
-- Return the deadline as an ISO date string (YYYY-MM-DD). Do not invent deadlines — if you cannot confirm a specific deadline, leave the grant out entirely.
+- Include grants that are either (a) dated with a deadline in the next 3 months, or (b) rolling/open-ended and accepting applications now. Exclude only expired grants, grants dated more than 3 months out, and cycles that haven't opened. Return [] if nothing qualifies.
+- Return the deadline as an ISO date string (YYYY-MM-DD) when there is a confirmed one; use null for rolling/open-ended grants or when no deadline is stated. Do not invent deadlines.
 - Use null for amount_min or amount_max if unknown.
 - URL must be a real, specific page (not a homepage).
 - fit_rationale must reference something specific about ${name} (a focus area, population served, or program).

@@ -40,15 +40,15 @@ const { data: rows, error: mErr } = await supabase
   .limit(5);
 if (mErr) throw new Error(`matches lookup failed: ${mErr.message}`);
 
-// Only send grants the dashboard actually shows: confirmed deadline within the
-// next 90 days (mirrors dashboard-view's APPLY_WINDOW_DAYS). Otherwise the test
-// email lists expired grants the site hides, and their "Review match" links
-// 404 because the view filters them out.
+// Only send grants the dashboard actually shows (mirrors dashboard-view's
+// inApplyWindow): rolling/undated grants are shown; dated grants only while
+// within the 90-day window. Otherwise the test email lists expired grants the
+// site hides, and their "Review match" links 404.
 const DAY_MS = 24 * 60 * 60 * 1000;
 function inApplyWindow(deadline) {
-  if (!deadline) return false;
+  if (!deadline) return true; // rolling/undated
   const d = new Date(deadline + 'T00:00:00');
-  if (isNaN(d.getTime())) return false;
+  if (isNaN(d.getTime())) return true;
   const days = Math.ceil((d.getTime() - Date.now()) / DAY_MS);
   return days >= 0 && days <= 90;
 }
