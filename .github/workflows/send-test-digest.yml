@@ -1,0 +1,38 @@
+name: Send Test Digest
+
+# Manual-only utility to send ONE digest email from an org's already-saved
+# matches (see src/send-test-digest.js). Never runs on a schedule. Does not
+# touch last_sent or the SUPPRESS_DIGESTS kill-switch, so it can't disturb the
+# real weekly cadence — it just verifies the email path end-to-end.
+on:
+  workflow_dispatch:
+    inputs:
+      org_email:
+        description: 'Org email to send a one-off test digest to'
+        required: true
+        default: adhiyanth.r@gmail.com
+        type: string
+
+jobs:
+  send-test-digest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci
+      - run: node src/send-test-digest.js
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          MAIL_FROM: ${{ vars.MAIL_FROM }}
+          UNSUBSCRIBE_BASE_URL: ${{ vars.UNSUBSCRIBE_BASE_URL }}
+          DASHBOARD_BASE_URL: ${{ vars.DASHBOARD_BASE_URL }}
+          APP_BASE_URL: ${{ vars.APP_BASE_URL }}
+          # Extra recipients stay disabled (DIGEST_RECIPIENTS is unset), so this
+          # goes only to the org's own address.
+          DIGEST_RECIPIENTS: ${{ vars.DIGEST_RECIPIENTS }}
+          TARGET_ORG_EMAIL: ${{ github.event.inputs.org_email }}
