@@ -74,8 +74,11 @@ function unsubscribeUrl(org) {
 function matchUrl(org, g) {
   if ((org.email || '').toLowerCase() === WFAF_DASHBOARD_EMAIL) {
     const base = process.env.DASHBOARD_BASE_URL;
-    if (!base || !org.dashboard_token || !g.match_id) return null;
-    return `${base.replace(/\/$/, '')}/dashboard/${org.dashboard_token}/matches/${g.match_id}`;
+    // The dashboard match-detail route resolves by GRANT id (grants.id), not the
+    // org_grants surrogate id — TokenMatchDetail does matches.find(grant_id === param),
+    // matching the dashboard's own links. Use g.id (grant_id), NOT g.match_id.
+    if (!base || !org.dashboard_token || !g.id) return null;
+    return `${base.replace(/\/$/, '')}/dashboard/${org.dashboard_token}/matches/${g.id}`;
   }
   const base = process.env.APP_BASE_URL;
   if (!base || !g.match_id) return null;

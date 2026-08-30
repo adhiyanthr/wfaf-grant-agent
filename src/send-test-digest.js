@@ -40,9 +40,22 @@ const { data: rows, error: mErr } = await supabase
   .limit(5);
 if (mErr) throw new Error(`matches lookup failed: ${mErr.message}`);
 
+// Only send grants the dashboard actually shows: confirmed deadline within the
+// next 90 days (mirrors dashboard-view's APPLY_WINDOW_DAYS). Otherwise the test
+// email lists expired grants the site hides, and their "Review match" links
+// 404 because the view filters them out.
+const DAY_MS = 24 * 60 * 60 * 1000;
+function inApplyWindow(deadline) {
+  if (!deadline) return false;
+  const d = new Date(deadline + 'T00:00:00');
+  if (isNaN(d.getTime())) return false;
+  const days = Math.ceil((d.getTime() - Date.now()) / DAY_MS);
+  return days >= 0 && days <= 90;
+}
+
 // Flatten the (org_grants + grants) join into the shape buildGrantCard expects.
 const grants = (rows || [])
-  .filter((r) => r.grants)
+  .filter((r) => r.grants && inApplyWindow(r.grants.deadline))
   .map((r) => ({
     id: r.grants.id,
     match_id: r.id,
@@ -62,7 +75,9 @@ const grants = (rows || [])
   }));
 
 if (!grants.length) {
-  throw new Error(`No saved matches for ${email} — nothing to send.`);
+  throw new Error(
+    `No in-window saved matches for ${email} — nothing to send (all saved grants are expired or out of the 90-day window).`
+  );
 }
 
 console.log(`Sending a test digest to ${email} with ${grants.length} saved match(es)...`);
